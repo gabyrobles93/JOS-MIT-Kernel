@@ -105,8 +105,21 @@ boot_alloc(uint32_t n)
 	// to a multiple of PGSIZE.
 	//
 	// LAB 2: Your code here.
+	result = nextfree;
 
-	return NULL;
+	// Están mapeados menos de 4 MB
+	// por lo que no podemos pedir
+	// más memoria que eso
+	if (n > (4 << 20)) {
+		panic("boot_alloc: out of memory");
+	}
+
+	if (n > 0) {
+		uint32_t pages_to_alloc = (n % PGSIZE) + 1;
+		nextfree = nextfree + pages_to_alloc * PGSIZE;
+	}
+
+	return result;
 }
 
 // Set up a two-level page table:
@@ -128,7 +141,7 @@ mem_init(void)
 	i386_detect_memory();
 
 	// Remove this line when you're ready to test this function.
-	panic("mem_init: This function is not finished\n");
+	// panic("mem_init: This function is not finished\n");
 
 	//////////////////////////////////////////////////////////////////////
 	// create initial page directory.
