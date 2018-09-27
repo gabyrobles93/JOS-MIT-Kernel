@@ -114,8 +114,7 @@ boot_alloc(uint32_t n)
 	}
 
 	if (n > 0) {
-		uint32_t pages_to_alloc = (n % PGSIZE) + 1;
-		nextfree = nextfree + pages_to_alloc * PGSIZE;	
+		nextfree = ROUNDUP(nextfree + n, PGSIZE);	
 	}
 
 	result = nextfree;
@@ -142,10 +141,10 @@ mem_init(void)
 	i386_detect_memory();
 
 	// Remove this line when you're ready to test this function.
-	cprintf("Nextfree (direccion donde termina el kernel en la VA): %p \n", boot_alloc(0));
-	cprintf("Npages (Numero de paginas de la memoria fisica): %lu \n", npages);
+	cprintf("Nextfree, la pagina inmediata luego de que termina el kernel en el AS: %p \n", boot_alloc(0));
+	cprintf("Npages cantidad de paginas fisicas: %lu \n", npages);
 	cprintf("Sizeof PageInfo struct: %lu", sizeof(struct PageInfo));
-	boot_alloc(0x2EC00);
+	boot_alloc(0x2EC000);
 
 	panic("mem_init: This function is not finished\n");
 
