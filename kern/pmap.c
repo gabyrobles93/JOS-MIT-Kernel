@@ -109,7 +109,7 @@ boot_alloc(uint32_t n)
 	// Están mapeados menos de 4 MB
 	// por lo que no podemos pedir
 	// más memoria que eso
-	if ((uintptr_t)nextfree + n > (KERNBASE + (4 << 20))) {
+	if ((uintptr_t)ROUNDUP(nextfree + n, PGSIZE) > (KERNBASE + (4 << 20))) {
 		panic("boot_alloc: out of memory");
 	}
 
@@ -144,7 +144,7 @@ mem_init(void)
 	cprintf("Nextfree, la pagina inmediata luego de que termina el kernel en el AS: %p \n", boot_alloc(0));
 	cprintf("Npages cantidad de paginas fisicas: %lu \n", npages);
 	cprintf("Sizeof PageInfo struct: %lu", sizeof(struct PageInfo));
-	boot_alloc(0x2EC000);
+	boot_alloc(0x2EC001);
 
 	panic("mem_init: This function is not finished\n");
 
