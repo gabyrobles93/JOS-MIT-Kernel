@@ -142,8 +142,8 @@ mem_init(void)
 	i386_detect_memory();
 
 	// Remove this line when you're ready to test this function.
-	cprintf("Nextfree: %p \n", boot_alloc(0));
-	cprintf("Npages: %lu \n", npages);
+	cprintf("Nextfree (direccion donde termina el kernel en la VA): %p \n", boot_alloc(0));
+	cprintf("Npages (Numero de paginas de la memoria fisica): %lu \n", npages);
 	cprintf("Sizeof PageInfo struct: %lu", sizeof(struct PageInfo));
 	boot_alloc(0x2EC00);
 
