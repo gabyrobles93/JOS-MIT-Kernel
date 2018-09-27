@@ -105,19 +105,20 @@ boot_alloc(uint32_t n)
 	// to a multiple of PGSIZE.
 	//
 	// LAB 2: Your code here.
-	result = nextfree;
 
 	// Están mapeados menos de 4 MB
 	// por lo que no podemos pedir
 	// más memoria que eso
-	if (n > (4 << 20)) {
+	if ((uintptr_t)nextfree + n > (KERNBASE + (4 << 20))) {
 		panic("boot_alloc: out of memory");
 	}
 
 	if (n > 0) {
 		uint32_t pages_to_alloc = (n % PGSIZE) + 1;
-		nextfree = nextfree + pages_to_alloc * PGSIZE;
+		nextfree = nextfree + pages_to_alloc * PGSIZE;	
 	}
+
+	result = nextfree;
 
 	return result;
 }
@@ -141,7 +142,12 @@ mem_init(void)
 	i386_detect_memory();
 
 	// Remove this line when you're ready to test this function.
-	// panic("mem_init: This function is not finished\n");
+	cprintf("Nextfree: %p \n", boot_alloc(0));
+	cprintf("Npages: %lu \n", npages);
+	cprintf("Sizeof PageInfo struct: %lu", sizeof(struct PageInfo));
+	boot_alloc(0x2EC00);
+
+	panic("mem_init: This function is not finished\n");
 
 	//////////////////////////////////////////////////////////////////////
 	// create initial page directory.
