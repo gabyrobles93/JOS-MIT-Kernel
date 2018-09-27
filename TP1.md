@@ -22,8 +22,10 @@ Entonces `(pp - pages)` es una cuenta que realiza aritmética de punteros en la 
 
 boot_alloc_pos
 --------------
+a)
+Partiendo de KERNBASE (0xF0000000), 1 MB por delante se mapeará el Kernel. Que segun el análisis del ELF son 77847 bytes, da un total de 0xF0000000 + 0x00100000 + 0x00013017 = 0xF0113017 => 4027658263 bytes, que alineado a 4096 bytes da 4027658240 que es la dirección 0xF0113000. Es decir, que la primera dirección libre que devolverá boot_alloc es la correspondiente al inicio de la página siguiente a la anterior calculada, esto es: 0xF0114000.
 
-...
+Para asegurar esto, se realizó un print de dicha dirección y se verificó que es igual a la calculada.
 
 
 page_alloc
