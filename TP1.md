@@ -41,7 +41,7 @@ Como vemos ocupa `77850` bytes (`0x0001301a` en hexadecimal). Por lo tanto sumam
 
 Con lo cuál sabiendo que `nextfree` se inicializa en la dirección de memoria virtual de la página siguiente a la última página del `kernel`, deducimos que se inicializará en `0xf0114000`.
 
-2) Otro modo es ejecutar el comando `nm` sobre el binario, con la opción `-s` para obtener los símbolos del mismo ordenados según su posición en memoria:
+2) Otro modo es ejecutar el comando `nm` sobre el binario, con la opción `-n` para obtener los símbolos del mismo ordenados según su posición en memoria:
 ```
 ➜  TP1-SisOp git:(master) ✗ nm -n obj/kern/kernel
 0010000c T _start
