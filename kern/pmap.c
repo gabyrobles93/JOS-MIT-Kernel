@@ -113,11 +113,11 @@ boot_alloc(uint32_t n)
 		panic("boot_alloc: out of memory");
 	}
 
+	result = nextfree;
+
 	if (n > 0) {
 		nextfree = ROUNDUP(nextfree + n, PGSIZE);	
 	}
-
-	result = nextfree;
 
 	return result;
 }
@@ -141,10 +141,6 @@ mem_init(void)
 	i386_detect_memory();
 
 	// Remove this line when you're ready to test this function.
-	cprintf("Nextfree, la pagina inmediata luego de que termina el kernel en el AS: %p \n", boot_alloc(0));
-	cprintf("Npages cantidad de paginas fisicas: %lu \n", npages);
-	cprintf("Sizeof PageInfo struct: %lu", sizeof(struct PageInfo));
-	boot_alloc(0x2EC001);
 
 	panic("mem_init: This function is not finished\n");
 
@@ -264,14 +260,35 @@ page_init(void)
 	//  1) Mark physical page 0 as in use.
 	//     This way we preserve the real-mode IDT and BIOS structures
 	//     in case we ever need them.  (Currently we don't, but...)
+	pages[0].pp_ref = 1;
+	pages[0].pp_link = page_free_list;
 	//  2) The rest of base memory, [PGSIZE, npages_basemem * PGSIZE)
 	//     is free.
+	for (size_t i = 1 ; i < npages_basemem ; i++) {
+		pages[i].pp_ref = 0;
+		pages[i].pp_link = page_free_list;
+		page_free_list = &pages[i];
+	}
 	//  3) Then comes the IO hole [IOPHYSMEM, EXTPHYSMEM), which must
 	//     never be allocated.
+	uintptr_t kva;
+	for (kva = IOPHYSMEM ; kva < EXTPHYSMEM ; kva += PGSIZE) {
+		struct PageInfo * page = pa2page(PADDR(kva + KERNBASE));
+		page->pp_ref = 1;
+		page->pp_link = page_free_list;
+	}
 	//  4) Then extended memory [EXTPHYSMEM, ...).
 	//     Some of it is in use, some is free. Where is the kernel
 	//     in physical memory?  Which pages are already in use for
 	//     page tables and other data structures?
+	// Aca empieza el kernel
+	// Estan ocupadas todas las paginas 
+	// desde EXTPHYSMEM hasta boot_alloc(0)
+	for (kva = KERNBASE + EXTPHYSMEM ; kva < boot_alloc(0) ; kva += PGSIZE) {
+		struct PageInfo * page = pa2page(PADDR(kva));
+		page->pp_ref = 1;
+		page->pp_link = page_free_list;
+	}
 	//
 	// Change the code to reflect this.
 	// NB: DO NOT actually touch the physical memory corresponding to
