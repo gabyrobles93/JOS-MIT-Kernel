@@ -76,6 +76,43 @@ Ejecutando el `kernel` se obtiene lo siguiente:
 
 ![alt text](https://github.com/gabyrobles93/TP1-SisOp/blob/master/nextfree.png)
 
+b) A continuación se puede ver una sesión de `gdb` con lo que pide el enunciado y además comprueba lo formulado en el inciso anterior
+```
+➜  TP1-SisOp git:(master) ✗ make gdb
+gdb -q -s obj/kern/kernel -ex 'target remote 127.0.0.1:26000' -n -x .gdbinit
+Leyendo símbolos desde obj/kern/kernel...hecho.
+Remote debugging using 127.0.0.1:26000
+aviso: No executable has been specified and target does not support
+determining executable automatically.  Try using the "file" command.
+0x0000fff0 in ?? ()
+.gdbinit: No existe el archivo o el directorio.
+(gdb) b boot_alloc 
+Punto de interrupción 1 at 0xf0100995: file kern/pmap.c, line 98.
+(gdb) c
+Continuando.
+
+Breakpoint 1, boot_alloc (n=0) at kern/pmap.c:98
+98		if (!nextfree) {
+(gdb) p nextfree 
+$1 = 0x0
+(gdb) n
+100			nextfree = ROUNDUP((char *) end, PGSIZE);
+(gdb) p (char*)&end
+$2 = 0xf0113950 "\020"
+(gdb) n
+112		if ((uintptr_t)ROUNDUP(nextfree + n, PGSIZE) > (KERNBASE + (4 << 20))) {
+(gdb) p nextfree 
+$3 = 0xf0114000 ""
+(gdb) n
+116		if (n > 0) {
+(gdb) n
+123	}
+(gdb) p nextfree 
+$4 = 0xf0114000 ""
+(gdb) n
+mem_init () at kern/pmap.c:145
+```
+
 
 page_alloc
 ----------
