@@ -113,11 +113,11 @@ boot_alloc(uint32_t n)
 		panic("boot_alloc: out of memory");
 	}
 
+	result = nextfree;
+
 	if (n > 0) {
 		nextfree = ROUNDUP(nextfree + n, PGSIZE);	
 	}
-
-	result = nextfree;
 
 	return result;
 }
@@ -141,11 +141,6 @@ mem_init(void)
 	i386_detect_memory();
 
 	// Remove this line when you're ready to test this function.
-	cprintf("Nextfree, la pagina inmediata luego de que termina el kernel en el AS: %p \n", boot_alloc(0));
-	cprintf("Npages cantidad de paginas fisicas: %lu \n", npages);
-	cprintf("Sizeof PageInfo struct: %lu", sizeof(struct PageInfo));
-	boot_alloc(0x2EC001);
-
 	panic("mem_init: This function is not finished\n");
 
 	//////////////////////////////////////////////////////////////////////
