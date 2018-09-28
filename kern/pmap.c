@@ -141,7 +141,6 @@ mem_init(void)
 	i386_detect_memory();
 
 	// Remove this line when you're ready to test this function.
-
 	panic("mem_init: This function is not finished\n");
 
 	//////////////////////////////////////////////////////////////////////
