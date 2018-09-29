@@ -445,7 +445,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 		physaddr_t pt_phyaddr = page2pa(new_pt_page);
 		// Escribo esa dirección física en los 20 bits mas altos de la PDE
 		// CONSULTA: ¿QUÉ PASA SI LA PAGE DIRECTORY ENTRY YA ESTABA ESCRITA? ¿HAY QUE HACERLE CLEAR ACÁ?
-		pde |= (pt_phyaddr << PTXSHIFT);
+		pde |= pt_phyaddr;
 		// Seteo en 1 el bit de presencia en la PDE
 		pde |= PTE_P;
 		// Marco como referenciado la page info asociada a la pagina fisica alocada para la page table
