@@ -423,8 +423,7 @@ page_decref(struct PageInfo *pp)
 pte_t *
 pgdir_walk(pde_t *pgdir, const void *va, int create)
 {
-	
-	// Obtengo la entrad en la PD sumando a pgdir el indice de la VA
+	// Obtengo la entrada en la PD sumando a pgdir el indice de la VA
 	pde_t pde = *(pgdir + PDX(va));
 
 	if ((pde & PTE_P)) {
@@ -443,6 +442,9 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 		}
 		// Obtengo la direccion física de la entrada a la page table alocada
 		physaddr_t pt_phyaddr = page2pa(new_pt_page);
+
+		cprintf("La physical address es: %p \n", pt_phyaddr);
+
 		// Escribo esa dirección física en los 20 bits mas altos de la PDE
 		// CONSULTA: ¿QUÉ PASA SI LA PAGE DIRECTORY ENTRY YA ESTABA ESCRITA? ¿HAY QUE HACERLE CLEAR ACÁ?
 		pde |= pt_phyaddr;
@@ -517,7 +519,7 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 
 	if (*pte & PTE_P) {
 		// Si ya estaba ocupada la removemos
-		page_remove(pgdir, va);
+		page_remove(pgdir, va);	// NO IMPLEMENTADA
 	}
 
 	// Obtenemos la direccion fisica del struct PageInfo
@@ -854,7 +856,6 @@ check_page(void)
 	void *va;
 	int i;
 	extern pde_t entry_pgdir[];
-
 	// should be able to allocate three pages
 	pp0 = pp1 = pp2 = 0;
 	assert((pp0 = page_alloc(0)));
