@@ -450,6 +450,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 		*pde |= PTE_P;
 		*pde |= PTE_W;
 		*pde |= PTE_U;
+
 		// Marco como referenciado la page info asociada a la pagina fisica alocada para la page table
 		new_pt_page->pp_ref++;
 		
