@@ -259,23 +259,10 @@ page_init(void)
 	//  1) Mark physical page 0 as in use.
 	//     This way we preserve the real-mode IDT and BIOS structures
 	//     in case we ever need them.  (Currently we don't, but...)
-	pages[0].pp_ref = 1;
-	pages[0].pp_link = page_free_list;
 	//  2) The rest of base memory, [PGSIZE, npages_basemem * PGSIZE)
 	//     is free.
-	for (size_t i = 1 ; i < npages_basemem ; i++) {
-		pages[i].pp_ref = 0;
-		pages[i].pp_link = page_free_list;
-		page_free_list = &pages[i];
-	}
 	//  3) Then comes the IO hole [IOPHYSMEM, EXTPHYSMEM), which must
 	//     never be allocated.
-	uintptr_t kva;
-	for (kva = IOPHYSMEM ; kva < EXTPHYSMEM ; kva += PGSIZE) {
-		struct PageInfo * page = pa2page(PADDR(kva + KERNBASE));
-		page->pp_ref = 1;
-		page->pp_link = page_free_list;
-	}
 	//  4) Then extended memory [EXTPHYSMEM, ...).
 	//     Some of it is in use, some is free. Where is the kernel
 	//     in physical memory?  Which pages are already in use for
@@ -283,20 +270,19 @@ page_init(void)
 	// Aca empieza el kernel
 	// Estan ocupadas todas las paginas 
 	// desde EXTPHYSMEM hasta boot_alloc(0)
-	for (kva = KERNBASE + EXTPHYSMEM ; kva < boot_alloc(0) ; kva += PGSIZE) {
-		struct PageInfo * page = pa2page(PADDR(kva));
-		page->pp_ref = 1;
-		page->pp_link = page_free_list;
-	}
 	//
 	// Change the code to reflect this.
 	// NB: DO NOT actually touch the physical memory corresponding to
 	// free pages!
+	physaddr_t paddr;
 	size_t i;
-	for (i = 0; i < npages; i++) {
-		pages[i].pp_ref = 0;
-		pages[i].pp_link = page_free_list;
-		page_free_list = &pages[i];
+	for (i = 1; i < npages; i++) {
+		paddr = i * PGSIZE;
+		if (paddr >= PADDR(boot_alloc(0)) || paddr < IOPHYSMEM) {
+			pages[i].pp_ref = 0;
+		  pages[i].pp_link = page_free_list;
+		  page_free_list = &pages[i];
+		}
 	}
 }
 
