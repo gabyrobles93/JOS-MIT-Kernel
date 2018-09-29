@@ -427,40 +427,36 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 	pde_t * pde = pgdir + PDX(va);
 
 	if ((*pde & PTE_P)) {
-		// Obtengo la direccion fisica con PTE_ADDR y la traduzco a virtual
+		// Obtengo la direccion virtual del PT base register
 		pte_t * ptbr = KADDR(PTE_ADDR(*pde));
 
-		// Navego la Page Table con el ptbr mas el indice (segundos 10 bits de la VA) y retorno
-		// la dirección de la PTE deseada
-		return (ptbr + PTX(va));
+		// Si ya existe retornamos el PTE correspondiente
+		return ptbr + PTX(va);
 	} else if (create) {
 		// Si la page table buscada no está presente y el flag de create esta activado
 		struct PageInfo * new_pt_page = page_alloc(ALLOC_ZERO);
+
 		if (!new_pt_page) {
 			return NULL;	// Fallo el page alloc porque no había mas memoria
 		}
+
 		// Obtengo la direccion física de la entrada a la page table alocada
 		physaddr_t pt_phyaddr = page2pa(new_pt_page);
 
-		// Escribo esa dirección física en los 20 bits mas altos de la PDE
-		// CONSULTA: ¿QUÉ PASA SI LA PAGE DIRECTORY ENTRY YA ESTABA ESCRITA? ¿HAY QUE HACERLE CLEAR ACÁ?
-		*pde |= pt_phyaddr;
-
-		// Seteo en 1 el bit de presencia PTE en la PDE, el bit de escritura PTE_W y el bit de usuario PTE_U
-		*pde |= PTE_P;
-		*pde |= PTE_W;
-		*pde |= PTE_U;
+		// Escribimos la direccion fisica y los flags correspondientes
+		*pde = (pt_phyaddr | PTE_P | PTE_W | PTE_U);
 
 		// Marco como referenciado la page info asociada a la pagina fisica alocada para la page table
 		new_pt_page->pp_ref++;
-		
-		// Obtengo la dirección virtual de la page table entry, sumando a la page table entry base register
-		// el índice obtenido de la virtual address. Luego lo retorno.
-		pte_t * new_pte = (pte_t *) (KADDR(PTE_ADDR(*pde)) + PTX(va));
 
-		return new_pte;
+		// Obtengo la direccion virtual del PT base register
+		pte_t * ptbr = KADDR(PTE_ADDR(*pde));
+		
+		// Devolvemos el puntero a PTE
+		return ptbr + PTX(va);
 	} else {
-		// No está presente la page table buscada y el flag de create está desactivado
+		// No está presente la page table 
+		// buscada y el flag de create está desactivado
 		return NULL; 
 	}
 }
