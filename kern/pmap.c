@@ -179,7 +179,7 @@ mem_init(void)
 	check_page_alloc();
 
 	// Remove this line when you're ready to test this function.
-	panic("mem_init: This function is not finished\n");
+	// panic("mem_init: This function is not finished\n");
 
 	check_page();
 	
@@ -533,8 +533,20 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 struct PageInfo *
 page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 {
-	// Fill this function in
-	return NULL;
+	pte_t * pte = pgdir_walk(pgdir, va, 0);
+
+	if (pte == NULL) {
+		// No hay pagina mapeada para va
+		return NULL; 
+	}
+
+	if (pte_store) {
+		// Guardamos en pte_store la direccion de PTE
+		*pte_store = pte;
+	}
+
+	physaddr_t page_paddr = PTE_ADDR(*pte);
+	return pa2page(page_paddr);
 }
 
 //
