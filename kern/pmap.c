@@ -413,7 +413,7 @@ page_decref(struct PageInfo *pp)
 
 	Esta funcion es una funcion de soporte que permite llegar a la página que interesa.
 	Hay que chequear si el bit de presencia esta a cero (en ese caso la entrada dell page
-	directory no tendra nada). Si esta en cero, hay que alocar un page table y asignarselo
+	directory no tendra nada). Si esta en cero y flag de create, hay que alocar un page table y asignarselo
 	en esa posición con la dirección física de  la page table alocada y ponerle los bits que 
 	corresponda. 
 	Si aloca una pagina, hay que hacer pp_ref++ a cada 
@@ -423,8 +423,44 @@ page_decref(struct PageInfo *pp)
 pte_t *
 pgdir_walk(pde_t *pgdir, const void *va, int create)
 {
-	// Fill this function in
-	return NULL;
+	
+	// Obtengo la entrad en la PD sumando a pgdir el indice de la VA
+	pde_t pde = *(pgdir + PDX(va));
+
+	if ((pde & PTE_P)) {
+		// Obtengo los primeros 20 bits de la PDE (que es la direccion fisica de PTBR) la traduzco a virtual
+		// con KADDR y guardo ese puntero en pt
+		pte_t * ptbr = KADDR(PGNUM(pde));
+
+		// Navego la Page Table con el ptbr mas el indice (segundos 10 bits de la VA) y dereferencio
+		// para obtener el PTE
+		pte_t pte = *(ptbr + PTX(va));
+
+		// Obtengo los 20 bits mas altos de la PTE que es una dirección física y la convierto a virtual
+		// para retornarla.
+		return KADDR(PGNUM(pte));
+	} else if (create) {
+		// Si la page table buscada no está presente y el flag de create esta activado
+		struct PageInfo * new_pt_page = page_alloc(ALLOC_ZERO);
+		if (!new_pt_page) {
+			return NULL;	// Fallo el page alloc porque no había mas memoria
+		}
+		// Obtengo la direccion física de la entrada a la page table alocada
+		physaddr_t pt_phyaddr = page2pa(new_pt_page);
+		// Escribo esa dirección física en los 20 bits mas altos de la PDE
+		pde |= (pt_phyaddr << PTXSHIFT);
+		// Seteo en 1 el bit de presencia en la PDE
+		pde |= PTE_P;
+		// Marco como referenciado la page info asociada a la pagina fisica alocada para la page table
+		new_pt_page->pp_ref++;
+
+		pte_t * new_pte = (pte_t *) (page2kva(new_pt_page) + PTX(va));
+
+		return new_pte;
+	} else {
+		// No está presente la page table buscada y el flag de create está desactivado
+		return NULL; 
+	}
 }
 
 //
