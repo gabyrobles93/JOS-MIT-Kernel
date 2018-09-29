@@ -424,9 +424,9 @@ pte_t *
 pgdir_walk(pde_t *pgdir, const void *va, int create)
 {
 	// Obtengo la entrada en la PD sumando a pgdir el indice de la VA
-	pde_t pde = *(pgdir + PDX(va));
+	pde_t * pde = pgdir + PDX(va);
 
-	if ((pde & PTE_P)) {
+	if ((*pde & PTE_P)) {
 		// Obtengo los primeros 20 bits de la PDE (que es la direccion fisica de PTBR) la traduzco a virtual
 		// con KADDR y guardo ese puntero en pt
 		pte_t * ptbr = KADDR(PGNUM(pde));
@@ -447,11 +447,13 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 
 		// Escribo esa dirección física en los 20 bits mas altos de la PDE
 		// CONSULTA: ¿QUÉ PASA SI LA PAGE DIRECTORY ENTRY YA ESTABA ESCRITA? ¿HAY QUE HACERLE CLEAR ACÁ?
-		pde |= pt_phyaddr;
+		cprintf("pde antes: %x \n", pde);
+		*pde |= pt_phyaddr;
+		cprintf("pde despues: %x \n", pde);
 		// Seteo en 1 el bit de presencia PTE en la PDE, el bit de escritura PTE_W y el bit de usuario PTE_U
-		pde |= PTE_P;
-		pde |= PTE_W;
-		pde |= PTE_U;
+		*pde |= PTE_P;
+		*pde |= PTE_W;
+		*pde |= PTE_U;
 		// Marco como referenciado la page info asociada a la pagina fisica alocada para la page table
 		new_pt_page->pp_ref++;
 		// Obtengo la dirección virtual de la page table entry, sumando a la page table entry base register
