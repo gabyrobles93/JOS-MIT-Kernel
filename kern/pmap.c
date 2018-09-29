@@ -506,7 +506,34 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 int
 page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 {
-	// Fill this function in
+	pte_t * pte = pgdir_walk(pgdir, va, 1);
+
+	if (pte == NULL) {
+		// pgdir_walk pudo fallar por falta de memoria
+		return -E_NO_MEM;
+	}
+
+	if (*pte & PTE_P) {
+		// Si ya estaba ocupada la removemos
+		page_remove(pgdir, va);
+	}
+
+	// Obtenemos la direccion fisica del struct PageInfo
+	physaddr_t padrr = page2pa(pp);
+
+	// Seteamos los permisos
+	*pte |= (perm | PTE_P);
+
+	// No hace falta el shift porque los 12 bits de phadrr son 0
+	// pues las paginas estan alineadas a multiplos de 4096
+	*pte |= padrr;
+
+	// Actualizamos el estado de PageInfo
+	pp->pp_ref++;
+
+	// pp_link ya fue puesto a null en la llamada
+	// correspondiente a page_alloc
+
 	return 0;
 }
 
