@@ -116,7 +116,9 @@ mem_init () at kern/pmap.c:145
 
 page_alloc
 ----------
-
+ ¿En qué se diferencia `page2pa()` de `page2kva()`?
+ 
+El comportamiento de la función `page2pa()` fue descrito en la primer parte. La función `page2kva()`, hace uso de la misma pero en vez de retornar la dirección física asociada al `struct PageInfo` pasado por parámetro, a esta dirección física le aplica la macro `KADDR` que devuelve la dirección virtual correspondiente (siempre y cuando corresponde a una dirección del kernel, caso contrario ejecuta un `panic`).
 ...
 
 
