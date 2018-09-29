@@ -429,7 +429,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 	if ((*pde & PTE_P)) {
 		// Obtengo los primeros 20 bits de la PDE (que es la direccion fisica de PTBR) la traduzco a virtual
 		// con KADDR y guardo ese puntero en pt
-		pte_t * ptbr = KADDR(PGNUM(pde));
+		pte_t * ptbr = KADDR(PGNUM(*pde));
 
 		// Navego la Page Table con el ptbr mas el indice (segundos 10 bits de la VA) y retorno
 		// la dirección de la PTE deseada
@@ -519,6 +519,12 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 		return -E_NO_MEM;
 	}
 
+	// Actualizamos el estado de PageInfo
+	// Antes de page_remove ya que esta funcion
+	// puede llegar a liberar la pagina si es la ultima
+	// referencia. Esto evita el caso borde
+	pp->pp_ref++;
+
 	if (*pte & PTE_P) {
 		// Si ya estaba ocupada la removemos
 		page_remove(pgdir, va);	// NO IMPLEMENTADA
@@ -527,15 +533,10 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 	// Obtenemos la direccion fisica del struct PageInfo
 	physaddr_t padrr = page2pa(pp);
 
-	// Seteamos los permisos
-	*pte |= (perm | PTE_P);
-
 	// No hace falta el shift porque los 12 bits de phadrr son 0
 	// pues las paginas estan alineadas a multiplos de 4096
-	*pte |= padrr;
-
-	// Actualizamos el estado de PageInfo
-	pp->pp_ref++;
+	// seteamos la direccion fisica y los permisos
+	*pte = padrr | perm | PTE_P;
 
 	// pp_link ya fue puesto a null en la llamada
 	// correspondiente a page_alloc
@@ -607,7 +608,10 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 void
 page_remove(pde_t *pgdir, void *va)
 {
-	// Fill this function in
+	pte_t * pte;
+	struct PageInfo * page_to_remove = page_lookup(pgdir, va, &pte);
+	page_decref(page_to_remove);
+	*pte = 0;
 }
 
 //
