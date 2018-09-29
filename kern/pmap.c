@@ -254,6 +254,31 @@ mem_init(void)
 void
 page_init(void)
 {
+	// Hay paginas prohibidas y paginas libres.
+	// Las páginas prohibidas son todas las que ya estan ocupadas hasta este punto.
+	// Mas las que se indiquen en los comentarios en inglés de abajo.
+	// Las paginas prohibidas se ponen en 0 y en NULL
+	// En 0 porque si se intentan liberar tirará kernel panic
+	// Y en null porque no forman parte de la lista enlazada
+	// Entonces hay que enlazar todas las páginas menos las prohibidas
+	// Poniendolas en 0 (pues son libres) y enalzando los punteros
+	// Las ocupadas que habrá en el futuro si van a tener su valor en 1
+	// Pero su puntero estará en NULL pues no formaran mas parte de la lista libre
+	// Hasta que sean liberadas.
+
+	// Rocomienda dato: Que el for que viene ya hecho, poner if (condicion) continue;
+	// y luego las lineas originales de la funcion. Esa condicion es la que me dice
+	// si es una página prohibida, osea if(prohibida)
+	// Una manera muy facil es decir: 
+	/*
+		physaddr_t addr = 0
+		if (i = 1; i < npages; i++) { // i empieza en 1 para saltear la primera página
+			if (addr >= boot_alloc || addr < io_phys_mem) {
+				entonces no es prohibida
+			}
+			addr += PGSIZE;
+		}
+	*/
 	// The example code here marks all physical pages as free.
 	// However this is not truly the case.  What memory is free?
 	//  1) Mark physical page 0 as in use.
@@ -343,6 +368,26 @@ page_decref(struct PageInfo *pp)
 // Hint 3: look at inc/mmu.h for useful macros that mainipulate page
 // table and page directory entries.
 //
+
+/*
+	Recibe siempre como parámetro un pde_t * que es un puntero a una tira de 1024 words de 4 bytes.
+	pde_t * es accesible con corchetes [].
+	Es una estructura que sirve de Page Directory. Cada entrada tiene 32 bits. Los 20 bits mas altos
+	son una dirección física donde se ubica la Page Table en particular. Los 12 bits resntes son
+	bits de presencia.
+
+	De la casilla saco la dirección física, la conveierto en virtual y con eso referencio la Page Table
+	que quiero. 
+
+	Esta funcion es una funcion de soporte que permite llegar a la página que interesa.
+	Hay que chequear si el bit de presencia esta a cero (en ese caso la entrada dell page
+	directory no tendra nada). Si esta en cero, hay que alocar un page table y asignarselo
+	en esa posición con la dirección física de  la page table alocada y ponerle los bits que 
+	corresponda. 
+	Si aloca una pagina, hay que hacer pp_ref++ a cada 
+
+	Retorna un puntero (direccion virtual) a la page table
+*/
 pte_t *
 pgdir_walk(pde_t *pgdir, const void *va, int create)
 {
@@ -410,6 +455,15 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 //
 // Hint: the TA solution uses pgdir_walk and pa2page.
 //
+
+/*
+	Dada una dirección virtual nos da un PageInfo
+	pgdir_walk(VA) = direccion virtual de la entrada a la página
+	pte_t * p = pgdir_walk(va)
+	phys f = PTE_ADR(*p)		// me da la dirección fisica 
+	pa2page(f) -> Me retorna la página de la dirección física y retornamos esto
+*/
+
 struct PageInfo *
 page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 {
@@ -432,6 +486,13 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 // Hint: The TA solution is implemented using page_lookup,
 // 	tlb_invalidate, and page_decref.
 //
+
+/*
+	Recibe un VA y hace dos cosas:
+	- decref(pagina) (es una función que ya esta implementada)
+		decrementa el pageref y si queda en cero llama a free de la pagina automaticamente.
+	- limpiar PTE (Pone la page table entry a cero)
+*/
 void
 page_remove(pde_t *pgdir, void *va)
 {
