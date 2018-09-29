@@ -279,7 +279,7 @@ page_init(void)
 	for (i = 1; i < npages; i++) {
 		paddr = i * PGSIZE;
 		if (paddr >= PADDR(boot_alloc(0)) || paddr < IOPHYSMEM) {
-			pages[i].pp_ref = 0;
+			// pages[i].pp_ref = 0; // Fue seteado con memset
 		  pages[i].pp_link = page_free_list;
 		  page_free_list = &pages[i];
 		}
@@ -302,7 +302,21 @@ struct PageInfo *
 page_alloc(int alloc_flags)
 {
 	// Fill this function in
-	return 0;
+	if (page_free_list) {
+		struct PageInfo * page = page_free_list;
+	  page_free_list = page->pp_link;
+	  page->pp_link = NULL;
+
+	  if (alloc_flags & ALLOC_ZERO) {
+			// Seteamos a cero la pagina fisica
+			// no el struct PageInfo
+			memset(page2kva(page), 0, sizeof(struct PageInfo));
+		}
+
+		return page;
+	}
+
+	return NULL; // No free pages
 }
 
 //
@@ -315,6 +329,16 @@ page_free(struct PageInfo *pp)
 	// Fill this function in
 	// Hint: You may want to panic if pp->pp_ref is nonzero or
 	// pp->pp_link is not NULL.
+	if (pp->pp_link) {
+		panic("page_free: try to free page with pp_link set\n");
+	}
+
+	if (pp->pp_ref) {
+		panic("page_free: try to free page with pp_ref's\n");
+	}
+
+	pp->pp_link = page_free_list;
+	page_free_list = pp;
 }
 
 //
