@@ -446,8 +446,10 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 		// Escribo esa dirección física en los 20 bits mas altos de la PDE
 		// CONSULTA: ¿QUÉ PASA SI LA PAGE DIRECTORY ENTRY YA ESTABA ESCRITA? ¿HAY QUE HACERLE CLEAR ACÁ?
 		pde |= pt_phyaddr;
-		// Seteo en 1 el bit de presencia en la PDE
+		// Seteo en 1 el bit de presencia PTE en la PDE, el bit de escritura PTE_W y el bit de usuario PTE_U
 		pde |= PTE_P;
+		pde |= PTE_W;
+		pde |= PTE_U;
 		// Marco como referenciado la page info asociada a la pagina fisica alocada para la page table
 		new_pt_page->pp_ref++;
 		// Obtengo la dirección virtual de la page table entry, sumando a la page table entry base register

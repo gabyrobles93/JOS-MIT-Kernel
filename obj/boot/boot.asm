@@ -1,8 +1,8 @@
 
-obj/boot/boot.out:     formato del fichero elf32-i386
+obj/boot/boot.out:     file format elf32-i386
 
 
-Desensamblado de la sección .text:
+Disassembly of section .text:
 
 00007c00 <start>:
 .set CR0_PE_ON,      0x1         # protected mode enable flag
