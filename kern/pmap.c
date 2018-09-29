@@ -140,9 +140,6 @@ mem_init(void)
 	// Find out how much memory the machine has (npages & npages_basemem).
 	i386_detect_memory();
 
-	// Remove this line when you're ready to test this function.
-	panic("mem_init: This function is not finished\n");
-
 	//////////////////////////////////////////////////////////////////////
 	// create initial page directory.
 	kern_pgdir = (pde_t *) boot_alloc(PGSIZE);
@@ -180,7 +177,12 @@ mem_init(void)
 
 	check_page_free_list(1);
 	check_page_alloc();
+
+	// Remove this line when you're ready to test this function.
+	panic("mem_init: This function is not finished\n");
+
 	check_page();
+	
 
 	//////////////////////////////////////////////////////////////////////
 	// Now we set up virtual memory
@@ -273,7 +275,7 @@ page_init(void)
 	/*
 		physaddr_t addr = 0
 		if (i = 1; i < npages; i++) { // i empieza en 1 para saltear la primera página
-			if (addr >= boot_alloc || addr < io_phys_mem) {
+			if (addr >= boot_alloc(0) || addr < io_phys_mem) {
 				entonces no es prohibida
 			}
 			addr += PGSIZE;
@@ -300,10 +302,9 @@ page_init(void)
 	// NB: DO NOT actually touch the physical memory corresponding to
 	// free pages!
 	physaddr_t paddr;
-	size_t i;
-	for (i = 1; i < npages; i++) {
+	for (size_t i = 1; i < npages; i++) {
 		paddr = i * PGSIZE;
-		if (paddr >= PADDR(boot_alloc(0)) || paddr < IOPHYSMEM) {
+		if (paddr >= PADDR(boot_alloc(0)) || paddr < IOPHYSMEM) { // Si no es una dirección prohibida
 			// pages[i].pp_ref = 0; // Fue seteado con memset
 		  pages[i].pp_link = page_free_list;
 		  page_free_list = &pages[i];
@@ -335,7 +336,7 @@ page_alloc(int alloc_flags)
 	  if (alloc_flags & ALLOC_ZERO) {
 			// Seteamos a cero la pagina fisica
 			// no el struct PageInfo
-			memset(page2kva(page), 0, sizeof(struct PageInfo));
+			memset(page2kva(page), 0, PGSIZE);
 		}
 
 		return page;
