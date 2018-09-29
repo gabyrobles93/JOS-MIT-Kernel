@@ -195,6 +195,10 @@ mem_init(void)
 	//    - pages itself -- kernel RW, user NONE
 	// Your code goes here:
 
+	// Mapeo en kern_pgdir, UVPT - UPAGES direcciones virtuales a partir de UPAGES
+	// a direcciones físicas a partir de donde comienza el struct page info pages.
+	boot_map_region(kern_pgdir, UPAGES, UVPT-UPAGES, PADDR(pages), PTE_U | PTE_P);
+
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
 	// stack.  The kernel stack grows down from virtual address KSTACKTOP.
@@ -475,7 +479,10 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 static void
 boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm)
 {
-	// Fill this function in
+	for (size_t i = 0; i < size/PGSIZE; i++, va+=PGSIZE, pa+=PGSIZE) {
+		pte_t * pte = pgdir_walk(pgdir, (const void *) va, 1);
+		*pte |= pa | perm | PTE_P;
+	}
 }
 
 //
