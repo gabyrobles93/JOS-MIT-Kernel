@@ -432,13 +432,9 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 		// con KADDR y guardo ese puntero en pt
 		pte_t * ptbr = KADDR(PGNUM(pde));
 
-		// Navego la Page Table con el ptbr mas el indice (segundos 10 bits de la VA) y dereferencio
-		// para obtener el PTE
-		pte_t pte = *(ptbr + PTX(va));
-
-		// Obtengo los 20 bits mas altos de la PTE que es una dirección física y la convierto a virtual
-		// para retornarla.
-		return KADDR(PGNUM(pte));
+		// Navego la Page Table con el ptbr mas el indice (segundos 10 bits de la VA) y retorno
+		// la dirección de la PTE deseada
+		return (ptbr + PTX(va));
 	} else if (create) {
 		// Si la page table buscada no está presente y el flag de create esta activado
 		struct PageInfo * new_pt_page = page_alloc(ALLOC_ZERO);
