@@ -200,7 +200,7 @@ mem_init(void)
 
 	//page_insert    (pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 	//boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm)
-	boot_map_region(kern_pgdir, UPAGES, ROUNDUP(npages, PGSIZE), PADDR(pages), PTE_U | PTE_P);
+	boot_map_region(kern_pgdir, UPAGES, ROUNDUP(npages * sizeof(struct PageInfo), PGSIZE), PADDR(pages), PTE_U | PTE_P);
 
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
