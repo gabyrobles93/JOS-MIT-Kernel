@@ -21,14 +21,15 @@ __attribute__((__aligned__(PGSIZE)))
 pde_t entry_pgdir[NPDENTRIES] = {
 	// Map VA's [0, 4MB) to PA's [0, 4MB)
 	[0]
-		= ((uintptr_t)entry_pgtable - KERNBASE) + PTE_P,
+		= (0) + PTE_P + PTE_PS,
 	// Map VA's [KERNBASE, KERNBASE+4MB) to PA's [0, 4MB)
 	[KERNBASE>>PDXSHIFT]
-		= ((uintptr_t)entry_pgtable - KERNBASE) + PTE_P + PTE_W
+		= (0) + PTE_P + PTE_W + PTE_PS
 };
 
 // Entry 0 of the page table maps to physical page 0, entry 1 to
 // physical page 1, etc.
+#if 0
 __attribute__((__aligned__(PGSIZE)))
 pte_t entry_pgtable[NPTENTRIES] = {
 	0x000000 | PTE_P | PTE_W,
@@ -1056,4 +1057,4 @@ pte_t entry_pgtable[NPTENTRIES] = {
 	0x3fe000 | PTE_P | PTE_W,
 	0x3ff000 | PTE_P | PTE_W,
 };
-
+#endif
