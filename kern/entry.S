@@ -57,6 +57,13 @@ entry:
 	# is defined in entrypgdir.c.
 	movl	$(RELOC(entry_pgdir)), %eax
 	movl	%eax, %cr3
+
+  # Configuro el registro cr4
+  # para large pages
+  movl %cr4, %eax
+  orl $(CR4_PSE), %eax
+  movl %eax, %cr4
+  
 	# Turn on paging.
 	movl	%cr0, %eax
 	orl	$(CR0_PE|CR0_PG|CR0_WP), %eax
