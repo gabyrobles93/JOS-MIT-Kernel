@@ -487,6 +487,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 static void
 boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm)
 {
+  #ifndef TP1_PSE
 	assert(va % PGSIZE == 0);
 	assert(pa % PGSIZE == 0);
 	assert(size % PGSIZE == 0);
@@ -496,6 +497,33 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 		pte_t * pte = pgdir_walk(pgdir, (const void *) va, 1);
 		*pte |= pa | perm | PTE_P;
 	}
+  #else
+  // assert(va % PTSIZE == 0);
+	// assert(pa % PTSIZE == 0);
+	// assert(size % PTSIZE == 0);
+	assert(perm < (1 << PTXSHIFT));
+  for (size_t i = 0; i < size/PTSIZE; i++, va+=PTSIZE, pa+=PTSIZE) {
+		// Obtengo la entrada en la PD sumando a pgdir el indice de la VA
+	  pde_t * pde = pgdir + PDX(va);
+
+    if ((*pde & PTE_P)) {
+      continue;
+    }
+
+    *pde = pa | perm | PTE_P;
+
+    for (size_t j = 0 ; j < NPTENTRIES ; j++) {
+      struct PageInfo * new_pt_page = page_alloc(ALLOC_ZERO);
+      if (!new_pt_page) {
+        panic("boot_map_region: out of memory\n");
+      }
+      // Marco como referenciado la page info 
+      // asociada a la pagina fisica alocada para la page table
+		  new_pt_page->pp_ref++;
+    }
+	}
+
+  #endif
 }
 
 //
