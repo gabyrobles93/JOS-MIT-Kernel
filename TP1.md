@@ -121,4 +121,17 @@ page_alloc
 El comportamiento de la función `page2pa()` fue descrito en la primer parte. La función `page2kva()`, hace uso de la misma pero en vez de retornar la dirección física asociada al `struct PageInfo` pasado por parámetro, a esta dirección física le aplica la macro `KADDR` que devuelve la dirección virtual correspondiente (siempre y cuando corresponde a una dirección del kernel, caso contrario ejecuta un `panic`).
 ...
 
+map_region_large
+----------------
+¿Cuánta memoria se ahorró de este modo? ¿Es una cantidad fija, o depende de la memoria física de la computadora?
+
+En el modelo sin Large Pages, se necesita 1 Page Table para referenciar 1024 direcciones físicas.
+
+En el modelo con Large Pages, cada Large Page tiene 1024^2 = 1048576 direcciones físicas. Esto quiere decir que para referenciarlas se hubieran necesitado 1024 Pages Tables.
+
+Teniendo en cuenta que una Page Table ocupa una página = 4096 bytes, por cada Large Page nos estamos ahorrando 4096 x 1024 = 4 MiB en Pages Tables.
+
+La cantidad de memoria ahorrada entonces es de 4 MiB por cada Large Page utilizado.
+
+La desventaja que trae esta metodología, es que se corre el riesgo de tener mas memoria alocada de la necesaria, haciendo desperdicio de memoria.
 
