@@ -213,7 +213,7 @@ mem_init(void)
 	//       overwrite memory.  Known as a "guard page".
 	//     Permissions: kernel RW, user NONE
 	// Your code goes here:
-  boot_map_region(kern_pgdir, KSTACKTOP - KSTKSIZE, KSTKSIZE, PADDR(bootstack), PTE_W | PTE_P);
+    boot_map_region(kern_pgdir, KSTACKTOP - KSTKSIZE, KSTKSIZE, PADDR(bootstack), PTE_W | PTE_P);
 
 	//////////////////////////////////////////////////////////////////////
 	// Map all of physical memory at KERNBASE.
@@ -223,7 +223,7 @@ mem_init(void)
 	// we just set up the mapping anyway.
 	// Permissions: kernel RW, user NONE
 	// Your code goes here:
-  boot_map_region(kern_pgdir, KERNBASE, 0xffffffff - KERNBASE + 1, 0, PTE_W | PTE_P);
+ 	boot_map_region(kern_pgdir, KERNBASE, 0xffffffff - KERNBASE + 1, 0, PTE_W | PTE_P);
 
 	// Check that the initial page directory has been set up correctly.
 	check_kern_pgdir();
@@ -467,7 +467,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 		// No está presente la page table 
 		// buscada y el flag de create está desactivado
 		return NULL; 
-	}
+	}	
 }
 
 //
@@ -497,30 +497,28 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 		pte_t * pte = pgdir_walk(pgdir, (const void *) va, 1);
 		*pte |= pa | perm | PTE_P;
 	}
+	
   #else
-  // assert(va % PTSIZE == 0);
-	// assert(pa % PTSIZE == 0);
-	// assert(size % PTSIZE == 0);
-	assert(perm < (1 << PTXSHIFT));
-  for (size_t i = 0; i < size/PTSIZE; i++, va+=PTSIZE, pa+=PTSIZE) {
-		// Obtengo la entrada en la PD sumando a pgdir el indice de la VA
-	  pde_t * pde = pgdir + PDX(va);
+	if (va % PTSIZE == 0 && size % PTSIZE == 0 && pa % PTSIZE == 0) {
+		// Es una Large Page
+		for (size_t i = 0; i < size/PTSIZE; i++, va += PTSIZE, pa += PTSIZE) {
+			// Obtengo la PDE
+			pde_t * pde = pgdir + PDX(va);
+			// Escribo la dirección física de la página larga en la PDE,
+			// seteando los flags perm, PTE_PS (large page) y PTE_P (present)
+			*pde = pa | perm | PTE_PS | PTE_P;
+		}
+	} else {
+		// Es una Short Page
+		assert(va % PGSIZE == 0);
+		assert(pa % PGSIZE == 0);
+		assert(size % PGSIZE == 0);
+		assert(perm < (1 << PTXSHIFT));
 
-    if ((*pde & PTE_P)) {
-      continue;
-    }
-
-    *pde = pa | perm | PTE_P;
-
-    for (size_t j = 0 ; j < NPTENTRIES ; j++) {
-      struct PageInfo * new_pt_page = page_alloc(ALLOC_ZERO);
-      if (!new_pt_page) {
-        panic("boot_map_region: out of memory\n");
-      }
-      // Marco como referenciado la page info 
-      // asociada a la pagina fisica alocada para la page table
-		  new_pt_page->pp_ref++;
-    }
+		for (size_t i = 0; i < size/PGSIZE; i++, va+=PGSIZE, pa+=PGSIZE) {
+			pte_t * pte = pgdir_walk(pgdir, (const void *) va, 1);
+			*pte |= pa | perm | PTE_P;
+		}
 	}
 
   #endif
