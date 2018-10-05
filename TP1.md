@@ -125,13 +125,27 @@ map_region_large
 ----------------
 ¿Cuánta memoria se ahorró de este modo? ¿Es una cantidad fija, o depende de la memoria física de la computadora?
 
-En el modelo sin Large Pages, se necesita 1 Page Table para referenciar 1024 direcciones físicas.
+El uso de Large Pages tiene un ahorro de memoria. Lo podemos ver con el siguiente análisis:
 
-En el modelo con Large Pages, cada Large Page tiene 1024^2 = 1048576 direcciones físicas. Esto quiere decir que para referenciarlas se hubieran necesitado 1024 Pages Tables.
+Para referenciar `4 MiB` de memoria física **sin** large pages necesitamos:
+* Un `PDE (Page Directory Entry)` equivalente a `4 bytes`.
+* Una `Page Table` con todas sus entradas (1024 entradas de `4 bytes`) las cuales referencian cada una a una página de memoria física de `4096 bytes`.
+Entonces tenemos `1024 x 4096 bytes = 4 MiB`.
 
-Teniendo en cuenta que una Page Table ocupa una página = 4096 bytes, por cada Large Page nos estamos ahorrando 4096 x 1024 = 4 MiB en Pages Tables.
+Para referenciar `4MiB` de memoria física **con** large pages necesitamos:
+* Un `PDE (Page Directory Entry)` equivalente a `4 bytes`.
+Con ese `PDE` ya referenciamos a los `4 MiB` de memoria física.
 
-La cantidad de memoria ahorrada entonces es de 4 MiB por cada Large Page utilizado.
+Entonces el ahorro de memoria, **por cada large page**, es lo que ocupa la `Page Table`: `4096 bytes`.
 
-La desventaja que trae esta metodología, es que se corre el riesgo de tener mas memoria alocada de la necesaria, haciendo desperdicio de memoria.
+Con esto concluimos que dependiendo de cuánta memoria física tengamos distinta será la cantidad que tengamos que referenciar con estas estructuras. Utilizando la siguiente ecuación:
+
+`Ahorrado = (Mem_fís_total / 4 MiB) * 4 KiB = MiB_fis_total * KiB` 
+
+Tenemos los siguientes resultados para distintas memorias físicas de máquinas virtuales en las que corremos `JOS`:
+* `64 MiB`: nos ahorramos `64 KiB`.
+* `128 MiB`: nos ahorramos `128 KiB`.
+* `256 MiB`: nos ahorramos `256 KiB`.
+
+Este cálculo es aproximado ya que despreciamos el tamaño que ocupa la `Page Directory`.
 
