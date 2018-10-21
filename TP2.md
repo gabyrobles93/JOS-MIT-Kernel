@@ -19,12 +19,13 @@ Como todos los structs Env se inicializaron en 0 (con meminit), inicialmente ten
 
 Los primeros cinco procesos creados tendrán los siguientes identificadores:
 
+```
 Identificador número 1: 0x1000 = 4096
 Identificador número 2: 0x1001 = 4097
 Identificador número 3: 0x1002 = 4098
 Identificador número 4: 0x1003 = 4099
 Identificador número 5: 0x1004 = 4100
-
+```
 
 2. Supongamos que al arrancar el kernel se lanzan NENV proceso a ejecución. A continuación se destruye el proceso asociado a envs[630] y se lanza un proceso que cada segundo muere y se vuelve a lanzar. ¿Qué identificadores tendrá este proceso en sus sus primeras cinco ejecuciones?
 
@@ -32,11 +33,13 @@ En la primer ejecución, en el momento que se lanzan NENV procesos, el proceso a
 
 Por lo que las primeras 5 ejecuciones de ese proceso tienen los siguientes ids:
 
+```
 1er env_id: 0x1276 = 4726
 2do env_id: 0x2276 = 8822
 3er env_id: 0x3276 = 12918
 4to env_id: 0x4276 = 17014
 5to env_id: 0x5276 = 21110
+```
 ...
 
 
