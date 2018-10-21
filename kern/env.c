@@ -421,6 +421,19 @@ void
 env_create(uint8_t *binary, enum EnvType type)
 {
 	// LAB 3: Your code here.
+	struct Env * new_env = NULL;
+	int errcode;
+	// Alocamos un nuevo env con env_alloc
+	errcode = env_alloc(&new_env, 0);
+	if (errcode < 0) {
+		panic("env_create failed in 'env_alloc' with error code: %i\n", errcode);
+	}
+
+	// Cargamos el biario en el env con load_icode
+	load_icode(new_env, binary);
+
+	// Seteamos el env_type
+	new_env->env_type = type;
 }
 
 //
