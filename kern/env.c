@@ -12,8 +12,11 @@
 #include <kern/trap.h>
 #include <kern/monitor.h>
 
+// Arreglo de procesos (variable global, de longitud NENV).
 struct Env *envs = NULL;           // All environments
+// Proceso actualmente en ejecución (inicialmente NULL).
 struct Env *curenv = NULL;         // The current env
+// Lista enlazada de `struct Env` libres.
 static struct Env *env_free_list;  // Free environment list
                                    // (linked by Env->env_link)
 
@@ -119,6 +122,8 @@ env_init(void)
     // envs[i].env_status = ENV_FREE // Hecho por memset
     env_free_list = &envs[i];
   } 
+
+	
 	// Per-CPU part of the initialization
 	env_init_percpu();
 }
