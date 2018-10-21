@@ -374,10 +374,40 @@ load_icode(struct Env *e, uint8_t *binary)
 
 	// LAB 3: Your code here.
 
+	// binary es un puntero a un binario Elf
+	struct Elf * elf = (struct Elf *) binary;
+
+	// Recupero información útil del Elf
+	uint32_t program_headers_offset = elf->e_phoff; // Offset de los program headers dentro del Elf
+	uint32_t program_headers_num = elf->e_phnum; // Cantidad de segmentos...
+
+	// Cambiamos la page directory seteada en el CPU a la page directory del environment a configurar.
+	// Esto es para poder utilizar memset y memcopy
+	lcr3(PADDR(e->env_pgdir));
+	for (int i = 0; i < program_headers_num; i++) {
+		// Recuperamos el program header
+		struct Proghdr * program_header = binary + program_headers_offset + (i * sizeof(struct Proghdr));
+		// Si no es de tipo "ELF_PROG_LOAD" se debe descartar
+		if (program_header->p_type != ELF_PROG_LOAD) continue;
+		// Reservamos memsz bytes de memoria con region_alloc() en la dirección va del segmento
+		region_alloc(e, program_header->p_va, program_header->p_memsz);
+		// Copiamos filesz bytes desde binary + offset a va
+		memcpy(program_header->p_va, binary + program_header->p_offset, program_header->p_filesz);
+		// Escribimos en 0 el resto de bytes, desde va+filesz hasta va+memsz
+		memset(program_header->p_va + program_header->p_filesz, 0, program_header->p_memsz - program_header->p_filesz);
+	}
+	// Restauramos en el CPU la page directory del kernel
+	lcr3(PADDR(kern_pgdir));
+
+	// Se debe, además, configurar el entry point del proceso.
+	e->env_tf.tf_eip = elf->e_entry;
+
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
 
 	// LAB 3: Your code here.
+	
+	region_alloc(e, (void *) (USTACKTOP - PGSIZE), PGSIZE);
 }
 
 //
