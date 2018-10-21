@@ -1,0 +1,184 @@
+05/10/2018
+
+git remote add -f catedra http://<repo_original>
+
+en lugar de git merge origin/tp2 haremos git merge catedra/tp2
+
+Implementaremos un Proceso de Usuario
+*************************************
+
+Primeras tres partes: Proceso hasta poder largar un proceso
+Partes 4 y 5: Manejos de Syscalls
+
+En JOS los procesos se llaman Enviroments.
+
+Para ejecutar un programa hacer
+$ make run-hello-nox
+
+Tienen ID los procesos/enviroments, el Kernel no tiene.
+
+Los binarios que se ejecutarán esta concatenados como binarios en la imagen del kernel, al final de la imagen del kernel que es un ELF. Esos binarios (ej hello) se empotran concatenados al final de la imagen del kernel. Se dejan ciertos símbolos para saber donde comienza y donde termina un binario, de otra manera sería un chorizo de binario gigante indistinguible.
+Esos simbolos se pueden analizar con  nm /obj/ken/kernel  y comienzan con _binary_obj_user_... (por cada binario que empotra genera esas entradas). El símbolo END apunta al final de la imágen del kernel, cuando ya no hay nada mas.
+
+La macro ENV_CREATE es una macro para que en lugar que yo escriba env_create(_binary_obj_user...), recibe la ubicación del binario que se quiere ejecutar. El makefile compila la imagen del Kernel junto a todos los programas del final, pero se puede ejecutar un solo programa con make xxxxxxx, lo recompilará todo y definirá una macro para correr el programa en particular, ej: hello.
+
+En env.c estaremos implementado el código
+
+Todos los programas de JOS se enlazan con la librería estándar de JOS, es como una mini librería de C.
+
+MODO USUARIO    	    	| MODO KERNEL (*)
+SYS_a(parametros)		|
+SYS_b(parametros)	  --> SYSCALL --> INT(X) --> Syscall(parámetros)
+SYS_c(parámetros)	  id +  parámetros
+				|
+
+El struct evn es lo que el kernel guarda de cada proceso, por ejemplo su ID, el ID del padre, el TIPO, env_status es un enum que da el estado de un proceso (dying muriendo, .. etc). nrun es el numero de veces que se escheduleo el proceso. env_pgdir es un puntero al page directory del proceso. Trapframe guarda info referida a los cambios de contexto.
+
+De UTOP para abajo son los mapeos particulares de cada proceso. De UTOP para arriba son los mapings del Kernel.
+
+Cuando arranca un proceso, su stack comienza en USTACKTOP (ver el dibujo de la memoria). El stack de cada proceso se guarda junto con los registros asociados a este proceso.
+
+El struct PushRegs guarda el estado de los registros al momento del context switch.
+
+En trap.h
+
+
+Las tres variables globales:
+	struct Env *env =  NULL //
+	
+	sttatic struct Env *env_free_list //
+
+	struct Env * curenv = NULL;
+
+Los structs que usamos para alojar procesos estan PRE-ALOCADOS y son 1024. No hay que alocarlos en forma dinámica. Los libres lo sacamos de env_free_list
+
+1ra tarea)
+
+Boot_alloc, memset
+Reserver memoria, mapear con boot_map_region
+
+2da tarea)
+
+Enlazarlos, convertir el arreglo en una lista enlazada
+
+En la lista de paginas libres terminabamos enlazando al revez. Aquí si importa que sea hacia adelante pues el indice de los enviroments facilita la vida que sea asi. HAY QUE ITERAR HACIA ATRÁS.
+
+En los enviroments libres tenemos:
+env_   a NULL
+El status es FREE
+
+
+La función env_alloc()
+***********************
+
+Hay un algoritmo de generación de IDs (PID)
+
+Aca se inicializa un enviroment (proceso) y va completando el struct.
+
+Acá NO SE COPIAN LOS valores del proceso padre, esto lo hace FORK, no confundirse.
+
+
+x86 antes tenia segmentos y sporta hasta 6 segmentos. En linux no se usan, se usa paginado a secas. Por la unica razon q se usan los segmentos es porque estan muy mezclados con lo que es el cambio de privilegios. Los registros que tienen cual segmento esta activo, tienen también el privilegio del segmento.
+
+Tenemos que saer que estan estos segmetos:
+CODE SEGMENT
+DATA SEGMENT
+STACK SEGMENT
+ES 
+FS
+GS
+
+El kernel usa los primeros 3 y los configura que son para él.
+
+El ds, ss y es los redirecciona a un segmento que se llama US (User data), el 3 indica que es un segmento que corre en Nivel 3.
+
+el registro esp se inicializa a una dirección fija USTACKTOP donde el kernel crea el espacio para ese proceso (stack).
+
+
+Tarea: env_setup_vm
+
+Simplemente agarrar el Page directory del kernel y asegurarse de que la parte UTOP es igual. Simplemente es copiar una pagina del page directory del kernel al page directory del enviroment (Es un memcpy).
+
+
+Hasta ahora fue que el kernel configure las estructuras para correr procesos de usuario.
+Falta como ejecutar esos procesos.
+
+Tarea: region_alloc
+
+Es una funcion de utilidad que basicamente dice quiero q mi proceso tenga 16 k lo que sea reservado, para poder cargar el binario y ahi lo puedo copiar. Tiene un ciclo que llama a page insert y page alloc.
+
+Tarea: load_icode
+
+Carga el código de la región donde esta a la región de memoria donde se tiene que ejecutar. 
+
+Hay código en el bootloader de JOS para iterar sobre los segmentos (ver PROGRAM HEADERS en apuntes de cuaderno)
+
+El PROGRAM HEADER se puede ver inspeccionando el ELF del ejecutable HELLO (que esta empotrado en el binario del Kernel)
+
+FOR EACH ProgramHeader:
+	region_alloc(VirtAddr, size)
+	memcpy(offset, size, virtAddr)
+
+OJO, esto puede romper porque el page directory actual es el del kernel. Podría averiguar qué direcciones son las del page directory del proceso. OO LO QUE RECOMIENDA DATO ES: Antes de empezar el ciclo, activar el Page Directory del enviroment, y al salir del ciclo, reactivar el del Kernel. Para esto cargarlo en el registro cr3 y para eso usar la función lcr3(e->pgdir).
+
+
+12/10/2018
+
+Parte 4: la mas importante
+Esta parte va a ser la implementación de syscalls: 
+inc/
+trap.h y syscall.h
+	  --> tiene el enumerado de las syscalls
+kern/
+trap.h y syscall.h y trapentry.S
+	  --> tiene el prototipo de la llamada syscall (ver gráfico (*))
+
+En las syscalls dentro del wrapper siempre se pasan 6 parámetros. 1 es medio especial asique se podría decir que reciben 5.
+La syscall del lado usuario se hace con asm_volatile, pasando los 5 parametros por registros al procesador. HACE LA INTERRUPCIÓN 80 (no es 80 el numeroen JOS pero es analogo) y aparecemos en la syscall del lado kernel,
+esta originalmente tiene un panic (syscall not implemented).
+Se debe hacer un switch del enum de las syscalls y llama a la función de la syscall adecuada.
+
+En principio, tenemos que implementar solamente el handler de las syscalls que las deriva a la función adecuada (como se dijo arriba) y un poquito de la syscall puts (sys_cputs).
+
+La interrupción por software con INT 80 hace que se vaya a buscar un manejador de la interrupción enuna tabla llamada IDTR que tiene punteros a los segmentos de código que son handlers de cada interrupción en particular.
+
+Tabla con punteros a handlers:
+0	| m1    ---> m1{ }
+1	| m2    ---> m2{ }
+2	| m3    ---> m3{ }
+...
+48	| m48
+
+Lo que hay que tener es un wraper ej: Trap(int exception)
+los manejadores m1 .. m48 estaran escritos en ASM y trap estara escrito en C
+
+El trap tendrá un switch que ejecutará cada m1, m2, etc con el parámetro del número de excepción que corresponde.
+
+Los manejadores lo primero que harán será guardar los registros (trap frame). 
+
+Función _alltraps: en algún momento va a hacer un pusha() y guarda los 8 registros en el stack
+
+el pusha hace que el cpu pushee varios registros en el struct trapframe. el inconveniente es que el tf_err a veces es pusheado y a veces no,
+dependiendo de la interrupción. Esto es odioso porque despues para restaurar los registros tenemos que tener esto en cuenta para mapearlos. Como solución a esto tenemos los wrappers TRAPHANDLER y TRAPHANDLER_NOE
+
+Hasta ahora tenemos los handlers, tienen su dirección, pero falta ponerlos en la tabla IDTR. La tabla es "Gatedesc" tiene tamaño de 256 posiciones. Cada entrada no solo tiene la dirección del handler, sino un cacho de data más. Esta data mas no hace falta setearla a mano,
+se puede hacer con la macro SETGATE en mmu.h
+
+trap_init() : la renellaremos con SETGATE(idt[1], 0, code_segment, manejador1, 0);
+				  ...
+				  SETGATE(idt[48], 0, code_segment, manejador48, 3);
+
+Los nombres manejador1..48 son los nombres que definimos nosotros para cada manejador. C no va a encontra
+
+
+la función trap() en trap.c:
+ En JOS no se aceptan interrupciones mientras se esta ejecutando el KERNEL, solo se aceptan desde el modo usuario.
+De lo primero que hace es guardar el trapframe del enviroment que se estaba ejecutando.
+La función termina volviendo al environment que la llamó.
+
+trap_dispatch() va a tener un switch para cada excepcion posible:
+	switch (tf->tf_trapno) {
+		case t_syscall....
+	}	
+
+En este switch vamos a tener manejadores para el T_BRKPT y para T_PGFLT (breackpoint y page fault), para el resto nose hará nada y se volverá al proceso original.
