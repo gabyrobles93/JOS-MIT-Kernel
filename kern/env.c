@@ -57,6 +57,7 @@ struct Segdesc gdt[] = {
 	[GD_TSS0 >> 3] = SEG_NULL
 };
 
+// Pseudodesc es un struct que tiene limite y base
 struct Pseudodesc gdt_pd = { sizeof(gdt) - 1, (unsigned long) gdt };
 
 //
@@ -292,6 +293,30 @@ region_alloc(struct Env *e, void *va, size_t len)
 	//   'va' and 'len' values that are not page-aligned.
 	//   You should round va down, and round (va + len) up.
 	//   (Watch out for corner-cases!)
+
+	// Como pide, se redondea va hacia abajo y va+len hacia arriba
+	// a múltiplos de PGSIZE
+	uintptr_t r_va = ROUNDDOWN((uintptr_t) va, PGSIZE);
+	uintptr_t r_va_plus_len = ROUNDUP((uintptr_t) (va+len), PGSIZE);
+
+	// Cálculo de la cantidad de páginas a alocar
+	size_t pages_to_create = (r_va_plus_len - r_va) / PGSIZE;
+
+	while (pages_to_create) {
+		struct PageInfo * p = page_alloc(0); // Iindica explicitamente que no se deben poner a cero las paginas.
+		if (p == NULL) {
+			panic("region_alloc: Can't allocate page.\n");
+		}
+
+		// El bit de presencia ya es colocado por page_insert
+		page_insert(e->env_pgdir, p, (void *) r_va, PTE_W | PTE_U);
+		pages_to_create--;
+		r_va += PGSIZE;
+	}
+
+	// OBS: NO ME QUEDA CLARO CUÁL SERÍAN LOS CASOS BORDES CON LOS QUE HAY QUE TENER CUIDADO
+	// NI CÓMO TENER CUIDADO.
+
 }
 
 //
