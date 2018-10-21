@@ -40,8 +40,6 @@ Por lo que las primeras 5 ejecuciones de ese proceso tienen los siguientes ids:
 4to env_id: 0x4276 = 17014
 5to env_id: 0x5276 = 21110
 ```
-...
-
 
 env_init_percpu
 ---------------
@@ -57,13 +55,28 @@ GDTR:
 
 Referencia: https://c9x.me/x86/html/file_module_x86_id_156.html
 
-...
-
 
 env_pop_tf
 ----------
 
-...
+Esta función restaura el TrapFrame de un Environment. Un TrapFrame no es mas una estructura que guarda una "foto" del estado de los registros en el momento que se realizó un context switch. Cuando el kernel decide que ese Environment debe volver a ejecución realiza una serie de pasos, y el último de ellos es la función env_pop_tf(). El switch siempre se hace desde kernel a user space (nunca de user a user space).
+
+1. ¿Qué hay en `(%esp)` tras el primer `movl` de la función?
+
+El primer `movl` de la función es:
+```
+movl %0,%%esp
+```
+Que no hace otra cosa más que hacer que apuntar %esp a el TrapFrame del environment (nuevo tope de stack).
+Luego, con `popal` se hace una serie de pops (quitando cosas del nuevo stack, es decir, del TrapFrame) que se van asignando a los registros del CPU.
+
+2. ¿Qué hay en `(%esp)` justo antes de la instrucción `iret`? ¿Y en `8(%esp)`?
+
+Justo antes de la instrucción `iret`, `(%esp)` tiene la dirección del code segment (uint16_t tf_cs).
+
+3. ¿Cómo puede determinar la CPU si hay un cambio de ring (nivel de privilegio)?
+
+
 
 
 gdb_hello
