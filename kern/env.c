@@ -186,6 +186,24 @@ env_setup_vm(struct Env *e)
 	//    - The functions in kern/pmap.h are handy.
 
 	// LAB 3: Your code here.
+ 
+	// page alloc aloca la página pero me devuelve un puntero a
+	// PageInfo que es metadata asociada a una página física
+	// Con page2pa obtengo la dirección física del comienzo de la página
+	// y con KADDR obtengo la Kernel Virtual Address (pde_t *)
+	e->env_pgdir = (pde_t *) KADDR(page2pa(p));
+	// Page alloc no incrementa pp_ref, esto debe hacerlo el caller
+	// en la siguiente línea incrementamos pp_ref de PageInfo
+	p->pp_ref++;
+	// Ahora se debe copiar el Page Directory del kernel (kern_pgdir)
+	// por encima de UTOP en el Page Directory del nuevo environment
+	// Se podría copiar desde kern_pgdir[PDX(UTOP)] hasta kern_pgdir[1023]
+	// Pero dado que no se hizo ningún mapeo por debajo de UTOP, 
+	// todos los PDE de kern_pgdir por debajo de este punto están en 0
+	// Por lo tanto se puede usar kern_pgdir como template y copiarlo
+	// tal cual está
+	memcpy(e->env_pgdir, kern_pgdir, PGSIZE);
+
 
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
