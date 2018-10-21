@@ -46,6 +46,17 @@ Por lo que las primeras 5 ejecuciones de ese proceso tienen los siguientes ids:
 env_init_percpu
 ---------------
 
+Loads the values in the source operand into the global descriptor table register (GDTR)
+
+La instrucción `lgdt` ("Load Global Descriptor Table Register") recibe como operando la dirección de un struct del tipo `Pseudodesc`, que no es más que un uint16_t para LÍMITE y un uint32_t para BASE (en total 6 bytes). Donde BASE es la dirección virtual de la gdt (Global Descriptor Table) y LÍMITE es sizeof(gdt) - 1.
+
+Dicha instrucción guarda estos valores (BASE y LÍMITE) en un registro especial de CPU denominado GDTR. Dicho registro, en x86, tiene 48 bits de longitud. Los 16 bits mas bajos indican el tamaño de la GDT y los 32 bits mas altos indican su ubicación en memoria.
+
+```
+GDTR:
+|LIMIT|----BASE----|
+```
+
 ...
 
 
