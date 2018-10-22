@@ -3,7 +3,7 @@ TP2: Procesos de usuario
 
 env_alloc
 ---------
-Inicializa un nuevo enviroment (proceso) que se encuentre libre. Entre otras cosas, le asigna un identificador único. El algoritmo para generar un nuevo identificador es el siguiente:
+Inicializa un nuevo Environment (proceso) que se encuentre libre. Entre otras cosas, le asigna un identificador único. El algoritmo para generar un nuevo identificador es el siguiente:
 
 1. ¿Qué identificadores se asignan a los primeros 5 procesos creados? (Usar base hexadecimal.)
 
@@ -76,8 +76,17 @@ Justo antes de la instrucción `iret`, `(%esp)` tiene la dirección del code seg
 
 3. ¿Cómo puede determinar la CPU si hay un cambio de ring (nivel de privilegio)?
 
+En la función env_alloc (que inicializa un proceso de usuario), se ejecutan las siguientes líneas:
 
-
+```
+	e->env_tf.tf_ds = GD_UD | 3;
+	e->env_tf.tf_es = GD_UD | 3;
+	e->env_tf.tf_ss = GD_UD | 3;
+	e->env_tf.tf_esp = USTACKTOP;
+	e->env_tf.tf_cs = GD_UT | 3;
+```
+Que setean los 2 bits mas bajos del registro de cada segmento en 3, que equivale al 3er ring. Además, se marcan con GD_UD (global descriptor user data) y GD_UT (global descriptor user text).
+De esta manera el CPU sabe si el code segment a ejecutar pertenece al usuario o al kernel. Si pertenece al usuario, entonces `iret` restaura los registros SS (stack segment) y ESP (stack pointer). El stack pointer caerá dentro de [USTACKTOP-PGSIZE, USTACKTOP].
 
 gdb_hello
 ---------
