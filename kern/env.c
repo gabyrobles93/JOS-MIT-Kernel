@@ -192,6 +192,8 @@ env_setup_vm(struct Env *e)
 	// PageInfo que es metadata asociada a una página física
 	// Con page2pa obtengo la dirección física del comienzo de la página
 	// y con KADDR obtengo la Kernel Virtual Address (pde_t *)
+  // Podemos usar page2kva porque el arreglo de pages fue mapeado
+  // en la kernel virtual address
 	e->env_pgdir = (pde_t *) page2kva(p); 
 	// Page alloc no incrementa pp_ref, esto debe hacerlo el caller
 	// en la siguiente línea incrementamos pp_ref de PageInfo
@@ -199,10 +201,10 @@ env_setup_vm(struct Env *e)
 	// Ahora se debe copiar el Page Directory del kernel (kern_pgdir)
 	// por encima de UTOP en el Page Directory del nuevo environment
 	// Se podría copiar desde kern_pgdir[PDX(UTOP)] hasta kern_pgdir[1023]
-	// Pero dado que no se hizo ningún mapeo por debajo de UTOP, 
+	// Pero dado que no se hizo ningún mapeo por debajo de UTOP en kern_pgdir, 
 	// todos los PDE de kern_pgdir por debajo de este punto están en 0
 	// Por lo tanto se puede usar kern_pgdir como template y copiarlo
-	// tal cual está
+	// tal cual está entero
 	memcpy(e->env_pgdir, kern_pgdir, PGSIZE);
 
 
@@ -303,7 +305,7 @@ region_alloc(struct Env *e, void *va, size_t len)
 	size_t pages_to_create = (r_va_plus_len - r_va) / PGSIZE;
 
 	while (pages_to_create) {
-		struct PageInfo * p = page_alloc(0); // Iindica explicitamente que no se deben poner a cero las paginas.
+		struct PageInfo * p = page_alloc(0); // Indica explicitamente que no se deben poner a cero las paginas.
 		if (p == NULL) {
 			panic("region_alloc: Can't allocate page.\n");
 		}
@@ -313,10 +315,6 @@ region_alloc(struct Env *e, void *va, size_t len)
 		pages_to_create--;
 		r_va += PGSIZE;
 	}
-
-	// OBS: NO ME QUEDA CLARO CUÁL SERÍAN LOS CASOS BORDES CON LOS QUE HAY QUE TENER CUIDADO
-	// NI CÓMO TENER CUIDADO.
-
 }
 
 //
@@ -394,7 +392,7 @@ load_icode(struct Env *e, uint8_t *binary)
 		// Copiamos filesz bytes desde binary + offset a va
 		memcpy((void *) program_header->p_va, binary + program_header->p_offset, program_header->p_filesz);
 		// Escribimos en 0 el resto de bytes, desde va+filesz hasta va+memsz
-		memset((void *) program_header->p_va + program_header->p_filesz, 0, program_header->p_memsz - program_header->p_filesz);
+		memset((void *) (program_header->p_va + program_header->p_filesz), 0, program_header->p_memsz - program_header->p_filesz);
 	}
 	// Restauramos en el CPU la page directory del kernel
 	lcr3(PADDR(kern_pgdir));
@@ -426,7 +424,7 @@ env_create(uint8_t *binary, enum EnvType type)
 	// Alocamos un nuevo env con env_alloc
 	errcode = env_alloc(&new_env, 0);
 	if (errcode < 0) {
-		panic("env_create failed in 'env_alloc' with error code: %i\n", errcode);
+		panic("env_create failed in 'env_alloc' with error code: %e\n", errcode);
 	}
 
 	// Cargamos el biario en el env con load_icode
@@ -434,6 +432,9 @@ env_create(uint8_t *binary, enum EnvType type)
 
 	// Seteamos el env_type
 	new_env->env_type = type;
+
+  // Seteamos el parent ID
+  new_env->env_parent_id = 0;
 }
 
 //
@@ -574,5 +575,5 @@ env_run(struct Env *e)
 	// Usamos env_pop_tf() para restaurar los registros del environment y volver al modo usuario (salir del modo kernel)
 	env_pop_tf(&(e->env_tf));
 
-	panic("env_run not yet implemented");
+	// panic("env_run not yet implemented");
 }

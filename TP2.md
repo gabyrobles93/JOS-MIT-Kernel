@@ -59,7 +59,7 @@ Referencia: https://c9x.me/x86/html/file_module_x86_id_156.html
 env_pop_tf
 ----------
 
-Esta función restaura el TrapFrame de un Environment. Un TrapFrame no es mas una estructura que guarda una "foto" del estado de los registros en el momento que se realizó un context switch. Cuando el kernel decide que ese Environment debe volver a ejecución realiza una serie de pasos, y el último de ellos es la función env_pop_tf(). El switch siempre se hace desde kernel a user space (nunca de user a user space).
+Esta función restaura el TrapFrame de un Environment. Un TrapFrame no es mas una estructura que guarda una "foto" del estado de los registros en el momento que se realizó un context switch. Cuando el kernel decide que ese Environment debe volver a ejecución realiza una serie de pasos, y el último de ellos es la función `env_pop_tf()`. El switch siempre se hace desde kernel a user space (nunca de user a user space).
 
 1. ¿Qué hay en `(%esp)` tras el primer `movl` de la función?
 
@@ -72,11 +72,11 @@ Luego, con `popal` se hace una serie de pops (quitando cosas del nuevo stack, es
 
 2. ¿Qué hay en `(%esp)` justo antes de la instrucción `iret`? ¿Y en `8(%esp)`?
 
-Justo antes de la instrucción `iret`, `(%esp)` tiene la dirección del code segment (uint16_t tf_cs).
+Justo antes de la instrucción `iret`, `(%esp)` tiene la dirección del code segment `(uint16_t tf_cs)`. Mientras que en `8(%esp)` tenemos `(uint16_t tf_es)`, ya que `tf_err` y `tf_trapno` fueron omitidos con la instrucción `addl $0x8,%%esp`.
 
 3. ¿Cómo puede determinar la CPU si hay un cambio de ring (nivel de privilegio)?
 
-En la función env_alloc (que inicializa un proceso de usuario), se ejecutan las siguientes líneas:
+En la función `env_alloc` (que inicializa un proceso de usuario), se ejecutan las siguientes líneas:
 
 ```
 	e->env_tf.tf_ds = GD_UD | 3;
@@ -85,18 +85,30 @@ En la función env_alloc (que inicializa un proceso de usuario), se ejecutan las
 	e->env_tf.tf_esp = USTACKTOP;
 	e->env_tf.tf_cs = GD_UT | 3;
 ```
-Que setean los 2 bits mas bajos del registro de cada segmento en 3, que equivale al 3er ring. Además, se marcan con GD_UD (global descriptor user data) y GD_UT (global descriptor user text).
+Que setean los 2 bits mas bajos del registro de cada segmento, que equivale al 3er ring. Además, se marcan con GD_UD (global descriptor user data) y GD_UT (global descriptor user text).
 De esta manera el CPU sabe si el code segment a ejecutar pertenece al usuario o al kernel. Si pertenece al usuario, entonces `iret` restaura los registros SS (stack segment) y ESP (stack pointer). El stack pointer caerá dentro de [USTACKTOP-PGSIZE, USTACKTOP].
 
 gdb_hello
 ---------
 1. Poner un breakpoint en env_pop_tf() y continuar la ejecución hasta allí.
-2. En QEMU, entrar en modo monitor (Ctrl-a c), y mostrar las cinco primeras líneas del comando info registers.
-
 ```
-EAX=003bc000 EBX=f01c0000 ECX=f03bc000 EDX=0000023c
+(gdb) b env_pop_tf
+Punto de interrupción 1 at 0xf0102ead: file kern/env.c, line 514.
+(gdb) c
+Continuando.
+Se asume que la arquitectura objetivo es i386
+=> 0xf0102ead <env_pop_tf>:	push   %ebp
+
+Breakpoint 1, env_pop_tf (tf=0xf01c0000) at kern/env.c:514
+514	{
+```
+
+2. En QEMU, entrar en modo monitor (Ctrl-a c), y mostrar las cinco primeras líneas del comando info registers.
+```
+(qemu) info registers 
+EAX=003bc000 EBX=f01c0000 ECX=f03bc000 EDX=0000023d
 ESI=00010094 EDI=00000000 EBP=f0118fd8 ESP=f0118fbc
-EIP=f0102ea6 EFL=00000092 [--S-A--] CPL=0 II=0 A20=1 SMM=0 HLT=0
+EIP=f0102ead EFL=00000092 [--S-A--] CPL=0 II=0 A20=1 SMM=0 HLT=0
 ES =0010 00000000 ffffffff 00cf9300 DPL=0 DS   [-WA]
 CS =0008 00000000 ffffffff 00cf9a00 DPL=0 CS32 [-R-]
 ```
@@ -109,7 +121,6 @@ $1 = (struct Trapframe *) 0xf01c0000
 ```
 
 4. Imprimir, con `x/Nx tf` tantos enteros como haya en el struct Trapframe donde N = sizeof(Trapframe) / sizeof(int).
-
 ```
 (gdb) print sizeof(struct Trapframe) / sizeof(int)
 $2 = 17
@@ -121,7 +132,44 @@ $2 = 17
 0xf01c0040:	0x00000023
 ```
 
-5. Avanzar hasta justo después del movl ...,%esp, usando `si M` para ejecutar tantas instrucciones como sea necesario en un solo paso.
+5. Avanzar hasta justo después del `movl ...,%esp`, usando `si M` para ejecutar tantas instrucciones como sea necesario en un solo paso.
+```
+(gdb) disas
+Dump of assembler code for function env_pop_tf:
+=> 0xf0102ead <+0>:	push   %ebp
+   0xf0102eae <+1>:	mov    %esp,%ebp
+   0xf0102eb0 <+3>:	sub    $0xc,%esp
+   0xf0102eb3 <+6>:	mov    0x8(%ebp),%esp
+   0xf0102eb6 <+9>:	popa   
+   0xf0102eb7 <+10>:	pop    %es
+   0xf0102eb8 <+11>:	pop    %ds
+   0xf0102eb9 <+12>:	add    $0x8,%esp
+   0xf0102ebc <+15>:	iret   
+   0xf0102ebd <+16>:	push   $0xf010573c
+   0xf0102ec2 <+21>:	push   $0x20c
+   0xf0102ec7 <+26>:	push   $0xf0105706
+   0xf0102ecc <+31>:	call   0xf01000a9 <_panic>
+End of assembler dump.
+(gdb) si 4
+=> 0xf0102eb6 <env_pop_tf+9>:	popa   
+0xf0102eb6	515		asm volatile("\tmovl %0,%%esp\n"
+(gdb) disas
+Dump of assembler code for function env_pop_tf:
+   0xf0102ead <+0>:	push   %ebp
+   0xf0102eae <+1>:	mov    %esp,%ebp
+   0xf0102eb0 <+3>:	sub    $0xc,%esp
+   0xf0102eb3 <+6>:	mov    0x8(%ebp),%esp
+=> 0xf0102eb6 <+9>:	popa   
+   0xf0102eb7 <+10>:	pop    %es
+   0xf0102eb8 <+11>:	pop    %ds
+   0xf0102eb9 <+12>:	add    $0x8,%esp
+   0xf0102ebc <+15>:	iret   
+   0xf0102ebd <+16>:	push   $0xf010573c
+   0xf0102ec2 <+21>:	push   $0x20c
+   0xf0102ec7 <+26>:	push   $0xf0105706
+   0xf0102ecc <+31>:	call   0xf01000a9 <_panic>
+End of assembler dump.
+```
 
 
 6. Comprobar, con `x/Nx $sp` que los contenidos son los mismos que tf (donde N es el tamaño de tf).
@@ -137,7 +185,7 @@ $2 = 17
 
 7. Explicar con el mayor detalle posible cada uno de los valores. Para los valores no nulos, se debe indicar dónde se configuró inicialmente el valor, y qué representa.
 
-Para explicar cada uno de los valores, se debe entender que a este punto el "stack" tiene la estructura de un Trapframe, que se vió que tiene un tamaño de 17 bytes. La estructura de un Trapframe es la siguiente:
+Para explicar cada uno de los valores, se debe entender que a este punto el "stack" tiene la estructura de un Trapframe, que se vió que tiene un tamaño de 17 `ints` (68 bytes). La estructura de un Trapframe es la siguiente:
 
 ```
 struct Trapframe {
@@ -179,27 +227,28 @@ Las primeras dos líneas de valores de $sp:
 
 ```
 0xf01c0000:	0x00000000	0x00000000	0x00000000	0x00000000
-                  reg_edi         reg_esi         reg_ebp        reg_oesp
+              reg_edi     reg_esi     reg_ebp     reg_oesp
+
 0xf01c0010:	0x00000000	0x00000000	0x00000000	0x00000000
-                  reg_ebx         reg:edx         reg_ecx        reg_eax 
+              reg_ebx     reg_edx     reg_ecx     reg_eax 
 ```
 
-Son 8 bytes y se corresponde con la estructura de PushRegs, que son todos nulos (lógico si es la primera vez que entra en contexto este environment).
+Son 8 `ints` (32 bytes) y se corresponde con la estructura de PushRegs, que son todos nulos (lógico si es la primera vez que entra en contexto este environment).
 
-Luego , en la tercer línea de valores:
+Luego, en la tercer línea de valores:
 
 ```
 0xf01c0020:	0x00000023	0x00000023	0x00000000	0x00000000
-		 pad - es        pad - ds         trapno          tf_err 
- ```
-Los primeros 2 bytes corresponden a tf_es + tf_padding1 y tf_ds + padding2 respectivamente.
-Los valores de es y ds (0x0023) se deben a que en `env_alloc()` se inicializaron con el valor `GD_UD | 3` (Global descriptor number = User Data y 3er ring).
+		          pad - es    pad - ds    "trapno"    "tf_err" 
+```
+Los primeros 2 `ints` corresponden a `tf_es` + `tf_padding1` y `tf_ds` + `padding2` respectivamente.
+Los valores de `es` y `ds` `(0x0023)` se deben a que en `env_alloc()` se inicializaron con el valor `GD_UD | 3` (Global descriptor number = User Data y 3er ring).
 
 En la cuarta línea de valores tenemos:
 
 ```
 0xf01c0030:	0x00800020	0x0000001b	0x00000000	0xeebfe000
-                  tf_eip         pad - cs        tf_eflags        tf_esp
+              tf_eip      pad - cs    tf_eflags   tf_esp
 ```
 El valor de tf_eip (instruction pointer) es la dirección a la primera línea del código ejecutable del environment. Si investigamos el elf con `readelf -S obj/user/hello` se observa lo siguiente:
 
@@ -223,41 +272,90 @@ Section Headers:
 
 La línea señalada con `-> <- (*)` indica que el text segment, donde se ubica el código ejecutable, comienza en la dirección 0x00800020.
 
-El valor de cs (0x0000001b) es el resultado de haberlo inicializado como `GD_UT | 3` en env_alloc. Dichos valores setean el Global Descriptor Number como User Text y 3er Ring de privilegios.
+El valor de `cs` `(0x0000001b)` es el resultado de haberlo inicializado como `GD_UT | 3` en `env_alloc()`. Dichos valores setean el Global Descriptor Number como User Text y 3er Ring de privilegios.
 
-El valor de esp/stack pointer (0xeebfe000) se corresponde la dirección del stack seteado en env_alloc(), que es USTACKTOP. Esto es, el tope del stack en el Address Space del environment. Esquema:
-
+El valor de `esp/stack pointer (0xeebfe000)` se corresponde la dirección del stack seteado en `env_alloc()`, que es `USTACKTOP`. Esto es, el tope del stack en el Address Space del environment. Esquema:
+```
  *    USTACKTOP  --->  +------------------------------+ 0xeebfe000
  *                     |      Normal User Stack       | RW/RW  PGSIZE
  *                     +------------------------------+ 0xeebfd000
+```
 
 Por último, la quinta línea:
-
 ```
 0xf01c0040:	0x00000023
-                  pad - ss
+              pad - ss
 ```
 
-El valor de ss (stack segment) se corresponde con lo seteado en env_alloc(), que es exactamente lo mismo que se hizo para ds (data segment) y es (extra segment).
+El valor de `ss` (stack segment) se corresponde con lo seteado en env_alloc(), que es exactamente lo mismo que se hizo para `ds` (data segment) y `es` (extra segment).
 
 
 8. Continuar hasta la instrucción iret, sin llegar a ejecutarla. Mostrar en este punto, de nuevo, las cinco primeras líneas de info registers en el monitor de QEMU. Explicar los cambios producidos.
-
 ```
+(gdb) disas
+Dump of assembler code for function env_pop_tf:
+   0xf0102ead <+0>:	push   %ebp
+   0xf0102eae <+1>:	mov    %esp,%ebp
+   0xf0102eb0 <+3>:	sub    $0xc,%esp
+   0xf0102eb3 <+6>:	mov    0x8(%ebp),%esp
+=> 0xf0102eb6 <+9>:	popa   
+   0xf0102eb7 <+10>:	pop    %es
+   0xf0102eb8 <+11>:	pop    %ds
+   0xf0102eb9 <+12>:	add    $0x8,%esp
+   0xf0102ebc <+15>:	iret   
+   0xf0102ebd <+16>:	push   $0xf010573c
+   0xf0102ec2 <+21>:	push   $0x20c
+   0xf0102ec7 <+26>:	push   $0xf0105706
+   0xf0102ecc <+31>:	call   0xf01000a9 <_panic>
+End of assembler dump.
+(gdb) si 4
+=> 0xf0102ebc <env_pop_tf+15>:	iret   
+0xf0102ebc	515		asm volatile("\tmovl %0,%%esp\n"
+(gdb) disas
+Dump of assembler code for function env_pop_tf:
+   0xf0102ead <+0>:	push   %ebp
+   0xf0102eae <+1>:	mov    %esp,%ebp
+   0xf0102eb0 <+3>:	sub    $0xc,%esp
+   0xf0102eb3 <+6>:	mov    0x8(%ebp),%esp
+   0xf0102eb6 <+9>:	popa   
+   0xf0102eb7 <+10>:	pop    %es
+   0xf0102eb8 <+11>:	pop    %ds
+   0xf0102eb9 <+12>:	add    $0x8,%esp
+=> 0xf0102ebc <+15>:	iret   
+   0xf0102ebd <+16>:	push   $0xf010573c
+   0xf0102ec2 <+21>:	push   $0x20c
+   0xf0102ec7 <+26>:	push   $0xf0105706
+   0xf0102ecc <+31>:	call   0xf01000a9 <_panic>
+End of assembler dump.
+```
+
+Anterior:
+```
+(qemu) info registers
+EAX=003bc000 EBX=f01c0000 ECX=f03bc000 EDX=0000023d
+ESI=00010094 EDI=00000000 EBP=f0118fd8 ESP=f0118fbc
+EIP=f0102ead EFL=00000092 [--S-A--] CPL=0 II=0 A20=1 SMM=0 HLT=0
+ES =0010 00000000 ffffffff 00cf9300 DPL=0 DS   [-WA]
+CS =0008 00000000 ffffffff 00cf9a00 DPL=0 CS32 [-R-]
+```
+
+Actual:
+```
+(qemu) info registers
 EAX=00000000 EBX=00000000 ECX=00000000 EDX=00000000
 ESI=00000000 EDI=00000000 EBP=00000000 ESP=f01c0030
-EIP=f0102eb5 EFL=00000096 [--S-AP-] CPL=0 II=0 A20=1 SMM=0 HLT=0
+EIP=f0102ebc EFL=00000096 [--S-AP-] CPL=0 II=0 A20=1 SMM=0 HLT=0
 ES =0023 00000000 ffffffff 00cff300 DPL=3 DS   [-WA]
 CS =0008 00000000 ffffffff 00cf9a00 DPL=0 CS32 [-R-]
 ```
 
-Se actualizaron los valores de los registros de propósito general (EDI, ESI, EBP, EBX, EDX, ECX y EAX) a los valores traidos del Trapframe. Esto fué gracias a la instrucción `popal`
+Se actualizaron los valores de los registros de propósito general (`EDI`, `ESI`, `EBP`, `EBX`, `EDX`, `ECX` y `EAX`) a los valores traidos del Trapframe. Esto fué gracias a la instrucción `popal`
 
-Se actualizó el valor del registro ES. Esto fué gracias a la instrucción `popl %%es`
+Se actualizó el valor del registro `ES`. Esto fué gracias a la instrucción `popl %%es`
 
-Se actualizó el valor del registro DS. Esto fué gracias a la instrucción `popl %%ds`
+Se actualizó el valor del registro `DS`. Esto fué gracias a la instrucción `popl %%ds`
 
-El cambio producido en EPI se debe a que el instruccion pointer avanzó algunas pocas líneas de código, pero no porque se haya traido del Trapframe.
+El cambio producido en `EIP` se debe a que el instruccion pointer avanzó algunas pocas líneas de código, pero no porque se haya traido del Trapframe.
 
 El code segment no se vió afectado, tampoco los flags.
 
@@ -279,6 +377,7 @@ $1 = (void (*)()) 0x800020 <_start>
 Mostrar una última vez la salida de info registers en QEMU, y explicar los cambios producidos.
 
 ```
+(qemu) info registers
 EAX=00000000 EBX=00000000 ECX=00000000 EDX=00000000
 ESI=00000000 EDI=00000000 EBP=00000000 ESP=eebfe000
 EIP=00800020 EFL=00000002 [-------] CPL=3 II=0 A20=1 SMM=0 HLT=0
@@ -286,11 +385,22 @@ ES =0023 00000000 ffffffff 00cff300 DPL=3 DS   [-WA]
 CS =001b 00000000 ffffffff 00cffa00 DPL=3 CS32 [-R-]
 ```
 
-Ahora se actualizaron el EIP (Instruction pointer), CS (code segment), EFL (EFLAGS), y el SS (Stack Pointer) a los valores indicados por Trapframe.
+Ahora se actualizaron el `EIP` (Instruction pointer), `CS` (code segment), `EFL` (EFLAGS), y el `SS` (Stack Pointer) a los valores indicados por Trapframe.
 
-10. Poner un breakpoint temporal (tbreak, se aplica una sola vez) en la función syscall() y explicar qué ocurre justo tras ejecutar la instrucción int $0x30. Usar, de ser necesario, el monitor de QEMU.
+10. Poner un breakpoint temporal (tbreak, se aplica una sola vez) en la función syscall() y explicar qué ocurre justo tras ejecutar la instrucción `int $0x30`. Usar, de ser necesario, el monitor de QEMU.
+```
+(gdb) tbreak syscall
+Punto de interrupción temporal 2 at 0x8009ed: file lib/syscall.c, line 23.
+(gdb) c
+Continuando.
+=> 0x8009ed <syscall+17>:	mov    0x8(%ebp),%ecx
 
-Al ejecutar la instrucción `int $0x30` se genera una interrupción que es tomada por el kernel.
+Temporary breakpoint 2, syscall (num=0, check=-289415544, a1=4005551752, 
+    a2=13, a3=0, a4=0, a5=0) at lib/syscall.c:23
+23		asm volatile("int %1\n"
+```
+
+Al ejecutar la instrucción `int $0x30` se genera una interrupción que es tomada por el `kernel`.
 
 La información de info registers es:
 
@@ -301,4 +411,4 @@ EIP=0000e062 EFL=00000002 [-------] CPL=0 II=0 A20=1 SMM=0 HLT=0
 ES =0000 00000000 0000ffff 00009300
 CS =f000 000f0000 0000ffff 00009b00
 ```
-Observar que ahora tanto ES como CS (code segment) tienen sus últimos bits en 0, lo que significa que se está en el Ring 0 de privilegios (modo kernel).
+Observar que ahora tanto `ES` como `CS` (code segment) tienen sus últimos bits en 0, lo que significa que se está en el Ring 0 de privilegios (modo `kernel`).
