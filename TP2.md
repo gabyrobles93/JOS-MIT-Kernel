@@ -272,6 +272,33 @@ $1 = (void (*)()) 0x800020
 
 Cargar los símbolos de hello con `symbol-file obj/user/hello`. Volver a imprimir el valor del contador de programa
 
+```
+(gdb) p $pc
+$1 = (void (*)()) 0x800020 <_start>
+```
+Mostrar una última vez la salida de info registers en QEMU, y explicar los cambios producidos.
 
+```
+EAX=00000000 EBX=00000000 ECX=00000000 EDX=00000000
+ESI=00000000 EDI=00000000 EBP=00000000 ESP=eebfe000
+EIP=00800020 EFL=00000002 [-------] CPL=3 II=0 A20=1 SMM=0 HLT=0
+ES =0023 00000000 ffffffff 00cff300 DPL=3 DS   [-WA]
+CS =001b 00000000 ffffffff 00cffa00 DPL=3 CS32 [-R-]
+```
 
+Ahora se actualizaron el EIP (Instruction pointer), CS (code segment), EFL (EFLAGS), y el SS (Stack Pointer) a los valores indicados por Trapframe.
 
+10. Poner un breakpoint temporal (tbreak, se aplica una sola vez) en la función syscall() y explicar qué ocurre justo tras ejecutar la instrucción int $0x30. Usar, de ser necesario, el monitor de QEMU.
+
+Al ejecutar la instrucción `int $0x30` se genera una interrupción que es tomada por el kernel.
+
+La información de info registers es:
+
+```
+EAX=00000000 EBX=00000000 ECX=00000000 EDX=00000663
+ESI=00000000 EDI=00000000 EBP=00000000 ESP=00000000
+EIP=0000e062 EFL=00000002 [-------] CPL=0 II=0 A20=1 SMM=0 HLT=0
+ES =0000 00000000 0000ffff 00009300
+CS =f000 000f0000 0000ffff 00009b00
+```
+Observar que ahora tanto ES como CS (code segment) tienen sus últimos bits en 0, lo que significa que se está en el Ring 0 de privilegios (modo kernel).
