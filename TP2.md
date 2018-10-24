@@ -210,7 +210,56 @@ Section Headers:
   [Nr] Name              Type            Addr     Off    Size   ES Flg Lk Inf Al
   [ 0]                   NULL            00000000 000000 000000 00      0   0  0
 ->[ 1] .text             PROGBITS        00800020 006020 000d19 00  AX  0   0 16 <- (*)
-¡
+  [ 2] .rodata           PROGBITS        00800d3c 006d3c 000280 00   A  0   0  4
+  [ 3] .data             PROGBITS        00801000 007000 000004 00  WA  0   0  4
+  [ 4] .bss              NOBITS          00801004 007004 000004 00  WA  0   0  4
+  [ 5] .stab_info        PROGBITS        00200000 001000 000010 00  WA  0   0  1
+  [ 6] .stab             PROGBITS        00200010 001010 002905 0c   A  7   0  4
+  [ 7] .stabstr          STRTAB          00202915 003915 0017ee 00   A  0   0  1
+  [ 8] .symtab           SYMTAB          00000000 007004 000440 10      9  25  4
+  [ 9] .strtab           STRTAB          00000000 007444 0001fd 00      0   0  1
+  [10] .shstrtab         STRTAB          00000000 007641 00004e 00      0   0  1
+```
+
+La línea señalada con `-> <- (*)` indica que el text segment, donde se ubica el código ejecutable, comienza en la dirección 0x00800020.
+
+El valor de cs (0x0000001b) es el resultado de haberlo inicializado como `GD_UT | 3` en env_alloc. Dichos valores setean el Global Descriptor Number como User Text y 3er Ring de privilegios.
+
+El valor de esp/stack pointer (0xeebfe000) se corresponde la dirección del stack seteado en env_alloc(), que es USTACKTOP. Esto es, el tope del stack en el Address Space del environment. Esquema:
+
+ *    USTACKTOP  --->  +------------------------------+ 0xeebfe000
+ *                     |      Normal User Stack       | RW/RW  PGSIZE
+ *                     +------------------------------+ 0xeebfd000
+
+Por último, la quinta línea:
+
+```
+0xf01c0040:	0x00000023
+                  pad - ss
+```
+
+El valor de ss (stack segment) se corresponde con lo seteado en env_alloc(), que es exactamente lo mismo que se hizo para ds (data segment) y es (extra segment).
+
+
+8. Continuar hasta la instrucción iret, sin llegar a ejecutarla. Mostrar en este punto, de nuevo, las cinco primeras líneas de info registers en el monitor de QEMU. Explicar los cambios producidos.
+
+```
+EAX=00000000 EBX=00000000 ECX=00000000 EDX=00000000
+ESI=00000000 EDI=00000000 EBP=00000000 ESP=f01c0030
+EIP=f0102eb5 EFL=00000096 [--S-AP-] CPL=0 II=0 A20=1 SMM=0 HLT=0
+ES =0023 00000000 ffffffff 00cff300 DPL=3 DS   [-WA]
+CS =0008 00000000 ffffffff 00cf9a00 DPL=0 CS32 [-R-]
+```
+
+Se actualizaron los valores de los registros de propósito general (EDI, ESI, EBP, EBX, EDX, ECX y EAX) a los valores traidos del Trapframe. Esto fué gracias a la instrucción `popal`
+
+Se actualizó el valor del registro ES. Esto fué gracias a la instrucción `popl %%es`
+
+Se actualizó el valor del registro DS. Esto fué gracias a la instrucción `popl %%ds`
+
+El cambio producido en EPI se debe a que el instruccion pointer avanzó algunas pocas líneas de código, pero no porque se haya traido del Trapframe.
+
+El code segment no se vió afectado, tampoco los flags.
 
 9. Ejecutar la instrucción iret. En ese momento se ha realizado el cambio de contexto y los símbolos del kernel ya no son válidos.
 
