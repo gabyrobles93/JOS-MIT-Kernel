@@ -90,5 +90,215 @@ De esta manera el CPU sabe si el code segment a ejecutar pertenece al usuario o 
 
 gdb_hello
 ---------
+1. Poner un breakpoint en env_pop_tf() y continuar la ejecución hasta allí.
+2. En QEMU, entrar en modo monitor (Ctrl-a c), y mostrar las cinco primeras líneas del comando info registers.
 
-...
+```
+EAX=003bc000 EBX=f01c0000 ECX=f03bc000 EDX=0000023c
+ESI=00010094 EDI=00000000 EBP=f0118fd8 ESP=f0118fbc
+EIP=f0102ea6 EFL=00000092 [--S-A--] CPL=0 II=0 A20=1 SMM=0 HLT=0
+ES =0010 00000000 ffffffff 00cf9300 DPL=0 DS   [-WA]
+CS =0008 00000000 ffffffff 00cf9a00 DPL=0 CS32 [-R-]
+```
+
+3. De vuelta a GDB, imprimir el valor del argumento tf
+
+```
+(gdb) p tf
+$1 = (struct Trapframe *) 0xf01c0000
+```
+
+4. Imprimir, con `x/Nx tf` tantos enteros como haya en el struct Trapframe donde N = sizeof(Trapframe) / sizeof(int).
+
+```
+(gdb) print sizeof(struct Trapframe) / sizeof(int)
+$2 = 17
+(gdb) x/17x tf
+0xf01c0000:	0x00000000	0x00000000	0x00000000	0x00000000
+0xf01c0010:	0x00000000	0x00000000	0x00000000	0x00000000
+0xf01c0020:	0x00000023	0x00000023	0x00000000	0x00000000
+0xf01c0030:	0x00800020	0x0000001b	0x00000000	0xeebfe000
+0xf01c0040:	0x00000023
+```
+
+5. Avanzar hasta justo después del movl ...,%esp, usando `si M` para ejecutar tantas instrucciones como sea necesario en un solo paso.
+
+
+6. Comprobar, con `x/Nx $sp` que los contenidos son los mismos que tf (donde N es el tamaño de tf).
+
+```
+(gdb) x/17x $sp
+0xf01c0000:	0x00000000	0x00000000	0x00000000	0x00000000
+0xf01c0010:	0x00000000	0x00000000	0x00000000	0x00000000
+0xf01c0020:	0x00000023	0x00000023	0x00000000	0x00000000
+0xf01c0030:	0x00800020	0x0000001b	0x00000000	0xeebfe000
+0xf01c0040:	0x00000023
+```
+
+7. Explicar con el mayor detalle posible cada uno de los valores. Para los valores no nulos, se debe indicar dónde se configuró inicialmente el valor, y qué representa.
+
+Para explicar cada uno de los valores, se debe entender que a este punto el "stack" tiene la estructura de un Trapframe, que se vió que tiene un tamaño de 17 bytes. La estructura de un Trapframe es la siguiente:
+
+```
+struct Trapframe {
+	struct PushRegs tf_regs;
+	uint16_t tf_es;
+	uint16_t tf_padding1;
+	uint16_t tf_ds;
+	uint16_t tf_padding2;
+	uint32_t tf_trapno;
+	/* below here defined by x86 hardware */
+	uint32_t tf_err;
+	uintptr_t tf_eip;
+	uint16_t tf_cs;
+	uint16_t tf_padding3;
+	uint32_t tf_eflags;
+	/* below here only when crossing rings, such as from user to kernel */
+	uintptr_t tf_esp;
+	uint16_t tf_ss;
+	uint16_t tf_padding4;
+} __attribute__((packed));
+```
+
+Donde la estructura PushRegs se conforma como:
+
+```
+struct PushRegs {
+	/* registers as pushed by pusha */
+	uint32_t reg_edi;
+	uint32_t reg_esi;
+	uint32_t reg_ebp;
+	uint32_t reg_oesp;	
+	uint32_t reg_ebx;
+	uint32_t reg_edx;
+	uint32_t reg_ecx;
+	uint32_t reg_eax;
+} __attribute__((packed));
+```
+Las primeras dos líneas de valores de $sp:
+
+```
+0xf01c0000:	0x00000000	0x00000000	0x00000000	0x00000000
+                  reg_edi         reg_esi         reg_ebp        reg_oesp
+0xf01c0010:	0x00000000	0x00000000	0x00000000	0x00000000
+                  reg_ebx         reg:edx         reg_ecx        reg_eax 
+```
+
+Son 8 bytes y se corresponde con la estructura de PushRegs, que son todos nulos (lógico si es la primera vez que entra en contexto este environment).
+
+Luego , en la tercer línea de valores:
+
+```
+0xf01c0020:	0x00000023	0x00000023	0x00000000	0x00000000
+		 pad - es        pad - ds         trapno          tf_err 
+ ```
+Los primeros 2 bytes corresponden a tf_es + tf_padding1 y tf_ds + padding2 respectivamente.
+Los valores de es y ds (0x0023) se deben a que en `env_alloc()` se inicializaron con el valor `GD_UD | 3` (Global descriptor number = User Data y 3er ring).
+
+En la cuarta línea de valores tenemos:
+
+```
+0xf01c0030:	0x00800020	0x0000001b	0x00000000	0xeebfe000
+                  tf_eip         pad - cs        tf_eflags        tf_esp
+```
+El valor de tf_eip (instruction pointer) es la dirección a la primera línea del código ejecutable del environment. Si investigamos el elf con `readelf -S obj/user/hello` se observa lo siguiente:
+
+```
+There are 11 section headers, starting at offset 0x7690:
+
+Section Headers:
+  [Nr] Name              Type            Addr     Off    Size   ES Flg Lk Inf Al
+  [ 0]                   NULL            00000000 000000 000000 00      0   0  0
+->[ 1] .text             PROGBITS        00800020 006020 000d19 00  AX  0   0 16 <- (*)
+  [ 2] .rodata           PROGBITS        00800d3c 006d3c 000280 00   A  0   0  4
+  [ 3] .data             PROGBITS        00801000 007000 000004 00  WA  0   0  4
+  [ 4] .bss              NOBITS          00801004 007004 000004 00  WA  0   0  4
+  [ 5] .stab_info        PROGBITS        00200000 001000 000010 00  WA  0   0  1
+  [ 6] .stab             PROGBITS        00200010 001010 002905 0c   A  7   0  4
+  [ 7] .stabstr          STRTAB          00202915 003915 0017ee 00   A  0   0  1
+  [ 8] .symtab           SYMTAB          00000000 007004 000440 10      9  25  4
+  [ 9] .strtab           STRTAB          00000000 007444 0001fd 00      0   0  1
+  [10] .shstrtab         STRTAB          00000000 007641 00004e 00      0   0  1
+```
+
+La línea señalada con `-> <- (*)` indica que el text segment, donde se ubica el código ejecutable, comienza en la dirección 0x00800020.
+
+El valor de cs (0x0000001b) es el resultado de haberlo inicializado como `GD_UT | 3` en env_alloc. Dichos valores setean el Global Descriptor Number como User Text y 3er Ring de privilegios.
+
+El valor de esp/stack pointer (0xeebfe000) se corresponde la dirección del stack seteado en env_alloc(), que es USTACKTOP. Esto es, el tope del stack en el Address Space del environment. Esquema:
+
+ *    USTACKTOP  --->  +------------------------------+ 0xeebfe000
+ *                     |      Normal User Stack       | RW/RW  PGSIZE
+ *                     +------------------------------+ 0xeebfd000
+
+Por último, la quinta línea:
+
+```
+0xf01c0040:	0x00000023
+                  pad - ss
+```
+
+El valor de ss (stack segment) se corresponde con lo seteado en env_alloc(), que es exactamente lo mismo que se hizo para ds (data segment) y es (extra segment).
+
+
+8. Continuar hasta la instrucción iret, sin llegar a ejecutarla. Mostrar en este punto, de nuevo, las cinco primeras líneas de info registers en el monitor de QEMU. Explicar los cambios producidos.
+
+```
+EAX=00000000 EBX=00000000 ECX=00000000 EDX=00000000
+ESI=00000000 EDI=00000000 EBP=00000000 ESP=f01c0030
+EIP=f0102eb5 EFL=00000096 [--S-AP-] CPL=0 II=0 A20=1 SMM=0 HLT=0
+ES =0023 00000000 ffffffff 00cff300 DPL=3 DS   [-WA]
+CS =0008 00000000 ffffffff 00cf9a00 DPL=0 CS32 [-R-]
+```
+
+Se actualizaron los valores de los registros de propósito general (EDI, ESI, EBP, EBX, EDX, ECX y EAX) a los valores traidos del Trapframe. Esto fué gracias a la instrucción `popal`
+
+Se actualizó el valor del registro ES. Esto fué gracias a la instrucción `popl %%es`
+
+Se actualizó el valor del registro DS. Esto fué gracias a la instrucción `popl %%ds`
+
+El cambio producido en EPI se debe a que el instruccion pointer avanzó algunas pocas líneas de código, pero no porque se haya traido del Trapframe.
+
+El code segment no se vió afectado, tampoco los flags.
+
+9. Ejecutar la instrucción iret. En ese momento se ha realizado el cambio de contexto y los símbolos del kernel ya no son válidos.
+
+Imprimir el valor del contador de programa con `p $pc` o `p $eip`
+
+```
+(gdb) p $pc
+$1 = (void (*)()) 0x800020
+```
+
+Cargar los símbolos de hello con `symbol-file obj/user/hello`. Volver a imprimir el valor del contador de programa
+
+```
+(gdb) p $pc
+$1 = (void (*)()) 0x800020 <_start>
+```
+Mostrar una última vez la salida de info registers en QEMU, y explicar los cambios producidos.
+
+```
+EAX=00000000 EBX=00000000 ECX=00000000 EDX=00000000
+ESI=00000000 EDI=00000000 EBP=00000000 ESP=eebfe000
+EIP=00800020 EFL=00000002 [-------] CPL=3 II=0 A20=1 SMM=0 HLT=0
+ES =0023 00000000 ffffffff 00cff300 DPL=3 DS   [-WA]
+CS =001b 00000000 ffffffff 00cffa00 DPL=3 CS32 [-R-]
+```
+
+Ahora se actualizaron el EIP (Instruction pointer), CS (code segment), EFL (EFLAGS), y el SS (Stack Pointer) a los valores indicados por Trapframe.
+
+10. Poner un breakpoint temporal (tbreak, se aplica una sola vez) en la función syscall() y explicar qué ocurre justo tras ejecutar la instrucción int $0x30. Usar, de ser necesario, el monitor de QEMU.
+
+Al ejecutar la instrucción `int $0x30` se genera una interrupción que es tomada por el kernel.
+
+La información de info registers es:
+
+```
+EAX=00000000 EBX=00000000 ECX=00000000 EDX=00000663
+ESI=00000000 EDI=00000000 EBP=00000000 ESP=00000000
+EIP=0000e062 EFL=00000002 [-------] CPL=0 II=0 A20=1 SMM=0 HLT=0
+ES =0000 00000000 0000ffff 00009300
+CS =f000 000f0000 0000ffff 00009b00
+```
+Observar que ahora tanto ES como CS (code segment) tienen sus últimos bits en 0, lo que significa que se está en el Ring 0 de privilegios (modo kernel).
