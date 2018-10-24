@@ -386,15 +386,15 @@ load_icode(struct Env *e, uint8_t *binary)
 	lcr3(PADDR(e->env_pgdir));
 	for (int i = 0; i < program_headers_num; i++) {
 		// Recuperamos el program header
-		struct Proghdr * program_header = binary + program_headers_offset + (i * sizeof(struct Proghdr));
+		struct Proghdr * program_header = (struct Proghdr *) (binary + program_headers_offset + (i * sizeof(struct Proghdr)));
 		// Si no es de tipo "ELF_PROG_LOAD" se debe descartar
 		if (program_header->p_type != ELF_PROG_LOAD) continue;
 		// Reservamos memsz bytes de memoria con region_alloc() en la dirección va del segmento
-		region_alloc(e, program_header->p_va, program_header->p_memsz);
+		region_alloc(e, (void *) program_header->p_va, program_header->p_memsz);
 		// Copiamos filesz bytes desde binary + offset a va
-		memcpy(program_header->p_va, binary + program_header->p_offset, program_header->p_filesz);
+		memcpy((void *) program_header->p_va, binary + program_header->p_offset, program_header->p_filesz);
 		// Escribimos en 0 el resto de bytes, desde va+filesz hasta va+memsz
-		memset(program_header->p_va + program_header->p_filesz, 0, program_header->p_memsz - program_header->p_filesz);
+		memset((void *) program_header->p_va + program_header->p_filesz, 0, program_header->p_memsz - program_header->p_filesz);
 	}
 	// Restauramos en el CPU la page directory del kernel
 	lcr3(PADDR(kern_pgdir));

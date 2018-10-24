@@ -47,9 +47,32 @@
  * Lab 3: Your code here for generating entry points for the different traps.
  */
 
+TRAPHANDLER_NOEC(trap_0, 0)
+TRAPHANDLER_NOEC(trap_1, 1)
+
+TRAPHANDLER_NOEC(trap_3, 3)
+TRAPHANDLER_NOEC(trap_4, 4)
+TRAPHANDLER_NOEC(trap_5, 5)
+TRAPHANDLER_NOEC(trap_6, 6)
+TRAPHANDLER_NOEC(trap_7, 7)
+TRAPHANDLER(trap_8, 8)
+
+TRAPHANDLER(trap_10, 10)
+TRAPHANDLER(trap_11, 11)
+TRAPHANDLER(trap_12, 12)
+TRAPHANDLER(trap_13, 13)
+TRAPHANDLER(trap_14, 14)
+
+TRAPHANDLER_NOEC(trap_16, 16)
+TRAPHANDLER(trap_17, 17)
+TRAPHANDLER_NOEC(trap_18, 18)
+TRAPHANDLER_NOEC(trap_19, 19)
+TRAPHANDLER_NOEC(trap_20, 20)
 
 
 /*
  * Lab 3: Your code here for _alltraps
  */
+
+_alltraps:
 

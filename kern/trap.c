@@ -23,6 +23,29 @@ static struct Trapframe *last_tf;
 struct Gatedesc idt[256] = { { 0 } };
 struct Pseudodesc idt_pd = { sizeof(idt) - 1, (uint32_t) idt };
 
+// Declaración de los prototipos de trap
+
+extern void trap_0();
+extern void trap_1();
+
+extern void trap_3();
+extern void trap_4();
+extern void trap_5();
+extern void trap_6();
+extern void trap_7();
+extern void trap_8();
+
+extern void trap_10();
+extern void trap_11();
+extern void trap_12();
+extern void trap_13();
+extern void trap_14();
+
+extern void trap_16();
+extern void trap_17();	
+extern void trap_18();
+extern void trap_19();
+extern void trap_20();
 
 static const char *
 trapname(int trapno)
@@ -64,6 +87,55 @@ trap_init(void)
 	extern struct Segdesc gdt[];
 
 	// LAB 3: Your code here.
+
+	// Se debe configurar las interrupciones del vector IDT
+	// (Interruption Descriptor Table)
+	// Para eso utilizamos la macro SETGATE
+	// 1er parámetro: Gate. Ejemplo: idt[1]
+	// 2do parámetro: istrap?: En JOS va siempre 0 (para deshabilitar interrupciones
+	//                         dentro de la misma interrupción).
+	// 3er parámetro: selector de code segment para buscar el handler de la interrupción
+	//                En este caso será el text segment del kernel (macro GD_KT)
+	// 4to parámetro: offset dentro del code segment para buscar el handler
+	// 5to parámetro: Descriptor privilege level. En todo caso sera 0 (ring 0 para kernel)
+
+	// DIVIDE ERROR #DE
+	SETGATE(idt[0], 0, GD_KT, trap_0, 0);
+	// DEBUG EXCEPTION
+	SETGATE(idt[1], 0, GD_KT, trap_1, 0);
+
+	// Breakpoint
+	SETGATE(idt[3], 0, GD_KT, trap_3, 0);
+	// Overflow
+	SETGATE(idt[4], 0, GD_KT, trap_4, 0);
+	// Bound Range Exceded
+	SETGATE(idt[5], 0, GD_KT, trap_5, 0);
+	// Invalid Opcode
+	SETGATE(idt[6], 0, GD_KT, trap_6, 0);
+	// Device Not Available
+	SETGATE(idt[7], 0, GD_KT, trap_7, 0);
+	// Double Fault
+	SETGATE(idt[8], 0, GD_KT, trap_8, 0);
+	// Invalid TSS
+	SETGATE(idt[10], 0, GD_KT, trap_10, 0);
+	// Segment Not Presen
+	SETGATE(idt[11], 0, GD_KT, trap_11, 0);
+	// Stack-Segment Fault
+	SETGATE(idt[12], 0, GD_KT, trap_12, 0);
+	// General Protection
+	SETGATE(idt[13], 0, GD_KT, trap_13, 0);
+	// Page Fault
+	SETGATE(idt[14], 0, GD_KT, trap_14, 0);
+	// x87 FPU Floating-Point Error (Math Fault)
+	SETGATE(idt[16], 0, GD_KT, trap_16, 0);
+	// Alignment Check
+	SETGATE(idt[17], 0, GD_KT, trap_17, 0);
+	// Machine ChecK
+	SETGATE(idt[18], 0, GD_KT, trap_18, 0);
+	// SIMD Floating-Point Exception
+	SETGATE(idt[19], 0, GD_KT, trap_19, 0);
+	// Virtualization Exception
+	SETGATE(idt[20], 0, GD_KT, trap_20, 0);
 
 	// Per-CPU setup
 	trap_init_percpu();
