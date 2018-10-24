@@ -192,7 +192,7 @@ env_setup_vm(struct Env *e)
 	// PageInfo que es metadata asociada a una página física
 	// Con page2pa obtengo la dirección física del comienzo de la página
 	// y con KADDR obtengo la Kernel Virtual Address (pde_t *)
-	e->env_pgdir = (pde_t *) KADDR(page2pa(p));
+	e->env_pgdir = (pde_t *) page2kva(p); 
 	// Page alloc no incrementa pp_ref, esto debe hacerlo el caller
 	// en la siguiente línea incrementamos pp_ref de PageInfo
 	p->pp_ref++;
@@ -550,6 +550,29 @@ env_run(struct Env *e)
 	//	e->env_tf to sensible values.
 
 	// LAB 3: Your code here.
+
+	if ((curenv != NULL) && (curenv->env_status == ENV_RUNNING)) {
+		// Seteamos el curenv (si no es null) en ENV_RUNNABLE si es que estaba en ENV_RUNNING
+		curenv->env_status = ENV_RUNNABLE;
+	}
+
+	// Seteamos curenv al nuevo environment
+	curenv = e;
+
+	// Seteamos el estado del nuevo curenv como ENV_RUNNING
+	curenv->env_status = ENV_RUNNING;
+
+	// Actualizamos el contador env_runs del curenv
+	curenv->env_runs++;
+
+	// Seteamos el address space del nuevo proceso
+	// No volvemos a setear el address space del kernel pues luego de que termine
+	// Esta función ya se terminó el context switch y estaremos ejecutando
+	// Un proceso de usuario!
+	lcr3(PADDR(e->env_pgdir));
+
+	// Usamos env_pop_tf() para restaurar los registros del environment y volver al modo usuario (salir del modo kernel)
+	env_pop_tf(&(e->env_tf));
 
 	panic("env_run not yet implemented");
 }
