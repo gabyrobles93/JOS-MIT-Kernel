@@ -72,7 +72,7 @@ Luego, con `popal` se hace una serie de pops (quitando cosas del nuevo stack, es
 
 2. ¿Qué hay en `(%esp)` justo antes de la instrucción `iret`? ¿Y en `8(%esp)`?
 
-Justo antes de la instrucción `iret`, `(%esp)` tiene la dirección del code segment `(uint16_t tf_cs)`. Mientras que en `8(%esp)` tenemos `(uint16_t tf_es)`, ya que `tf_err` y `tf_trapno` fueron omitidos con la instrucción `addl $0x8,%%esp`.
+Justo antes de la instrucción `iret`, `(%esp)` tiene la dirección del code segment `(uint16_t tf_cs)`. Mientras que en `8(%esp)` tenemos `(uintptr_t tf_esp)`.
 
 3. ¿Cómo puede determinar la CPU si hay un cambio de ring (nivel de privilegio)?
 
