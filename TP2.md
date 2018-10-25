@@ -412,3 +412,49 @@ ES =0000 00000000 0000ffff 00009300
 CS =f000 000f0000 0000ffff 00009b00
 ```
 Observar que ahora tanto `ES` como `CS` (code segment) tienen sus últimos bits en 0, lo que significa que se está en el Ring 0 de privilegios (modo `kernel`).
+
+
+kern_idt
+---------
+
+1. ¿Cómo decidir si usar TRAPHANDLER o TRAPHANDLER_NOEC? ¿Qué pasaría si se usara solamente la primera?
+
+Para decidir si usar una u la otra, se debe analizar para cada excepción/interrupción, si para esta el CPU automáticamente hace un push al stack del código de error o no. Para el primer caso se debe utilizar la macro TRAPHANDLER y lara el segundo TRAPHANDLER_NOEC. Se se utilizara solamente la primera, en los casos de excepciones/interrupciones donde el cpu no haga push del código de error, el stack basado en el trapframe estaría con un formáto inválido, desencadenando en errores graves.
+
+2. ¿Qué cambia, en la invocación de handlers, el segundo parámetro (istrap) de la macro SETGATE? ¿Por qué se elegiría un comportamiento u otro durante un syscall?
+
+Con el valor istrap = 0, la cpu deshabilita las interrupciones cuando se está en modo kernel. Con istrap = 1, la cpu no las desactiva. En JOS, no se considerará que el CPU tome interripciones cuando se esté en modo kerel. Otros kernels mas avanzados podrían ponerlo a 1.
+
+3. Leer user/softint.c y ejecutarlo con make run-softint-nox. ¿Qué excepción se genera? Si hay diferencias con la que invoca el programa… ¿por qué mecanismo ocurre eso, y por qué razones?
+
+
+Al ejecutar `make run-softint-nox` se obtiene lo siguiente por salida estándar:
+
+```
+[00000000] new env 00001000
+Incoming TRAP frame at 0xefffffbc
+TRAP frame at 0xf01c0000
+  edi  0x00000000
+  esi  0x00000000
+  ebp  0xeebfdfd0
+  oesp 0xefffffdc
+  ebx  0x00000000
+  edx  0x00000000
+  ecx  0x00000000
+  eax  0x00000000
+  es   0x----0023
+  ds   0x----0023
+  trap 0x0000000d General Protection
+  err  0x00000072
+  eip  0x00800036
+  cs   0x----001b
+  flag 0x00000082
+  esp  0xeebfdfd0
+  ss   0x----0023
+[00001000] free env 00001000
+Destroyed the only environment - nothing more to do!
+```
+
+Puede oservarse que el valor de `trap` es 0x0000000d que se corresponde con el decimal 13. El `trap` con dicho número es "General Protection" que es causado por "Any memory reference and other protection checks". Esto es diferente a la que se invocó en el programa (14 = page fault).
+
+¿Por qué? No sé xD
