@@ -104,8 +104,9 @@ trap_init(void)
 	// DEBUG EXCEPTION
 	SETGATE(idt[T_DEBUG], 0, GD_KT, trap_1, 0);
 
-	// Breakpoint
-	SETGATE(idt[T_BRKPT], 0, GD_KT, trap_3, 0);
+	// Breakpoint (En la tarea kern_interrupts se indica que debe
+	//				poder ser disparada por usuario RING 3)
+	SETGATE(idt[T_BRKPT], 0, GD_KT, trap_3, 3);
 	// Overflow
 	SETGATE(idt[T_OFLOW], 0, GD_KT, trap_4, 0);
 	// Bound Range Exceded
@@ -209,11 +210,39 @@ print_regs(struct PushRegs *regs)
 	cprintf("  eax  0x%08x\n", regs->reg_eax);
 }
 
+
+/*
+trap_dispatch() va a tener un switch para cada excepcion posible:
+	switch (tf->tf_trapno) {
+		case t_syscall....
+	}	
+
+En este switch vamos a tener manejadores para el T_BRKPT y para T_PGFLT 
+(breackpoint y page fault), para el resto nose hará nada y se volverá al 
+proceso original.
+
+Además, la excepción de breakpoint se debe poder lanzar desde programas de usuario. 
+En general, esta excepción se usa para implementar el depurado de código. 
+-> Para esto se debe modificar este gate en trap init.
+*/
 static void
 trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
+
+	switch (tf->tf_trapno) {
+		case T_BRKPT: {
+			monitor(tf);
+			return;
+		}
+		case T_PGFLT: {
+			page_fault_handler(tf);
+			return;
+		}
+		default:
+			break;
+	}
 
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
