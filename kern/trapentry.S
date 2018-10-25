@@ -75,4 +75,35 @@ TRAPHANDLER_NOEC(trap_20, 20)
  */
 
 _alltraps:
+	/* push values to make the stack look like a struct Trapframe */
+	/* Tener en cuenta que el CPU al recibir una interrupción con cambio de privilegios
+	   automáticamente hace un push al stack de SS, ESP, EFLAGS, CS, EIP y Error Code 
+	   En el TRAPHANDLER, antes de llamar a _alltraps, se hizo push de trapno
+	   Por lo tanto hay que pushear en este orden: ds, es y los registros de proposito general */
+	
+	pushl	%ds
+	pushl	%es
+	pushal		/* Lo contrario al popal de env_pop_tf */
+
+	/* load GD_KD into %ds and %es 
+	Ayuda: cargar GD_KD en %ds y %es mediante un registro intermedio de 16 bits 
+	(por ejemplo, %ax). Considerar, además, que GD_KD es una constante numérica, 
+	no una dirección de memoria (‘mov $GD_KD’ vs ‘mov GD_KD’).	
+	*/
+
+	mov $GD_KT, %ax
+	mov %ax, %ds
+	mov %ax, %es
+
+	/* pushl %esp to pass a pointer to the Trapframe as an argument to trap() */
+
+	pushl %esp
+
+	/* call trap */
+	call trap
+	
+
+	
+
+	
 
