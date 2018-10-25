@@ -415,7 +415,7 @@ Observar que ahora tanto `ES` como `CS` (code segment) tienen sus últimos bits 
 
 
 kern_idt
----------
+--------
 
 1. ¿Cómo decidir si usar TRAPHANDLER o TRAPHANDLER_NOEC? ¿Qué pasaría si se usara solamente la primera?
 
@@ -455,4 +455,81 @@ TRAP frame at 0xf01c0000
 Destroyed the only environment - nothing more to do!
 ```
 
-Puede oservarse que el valor de `trap` es 0x0000000d que se corresponde con el decimal 13. El `trap` con dicho número es "General Protection" que es causado por "Any memory reference and other protection checks". Esto es diferente a la que se invocó en el programa (14 = page fault). Esto se debe a que en el llamado de la interrupción 14 en `softint.c` se tiene privilegios de modo usuario, mientras que dicha interrupción en el archivo `trap.c`, `SETGATE(idt[T_PGFLT], 0, GD_KT, trap_14, 0);` fue declarada con un nivel de privilegio 0 (el quinto argumento) lo que quiere decir que solo el kernel puede transferir la ejecución a esa interrupción. Si se intenta violar esta regla ocurre una excepción `General Protection` (13) que es justamente la que ocurre
+Puede oservarse que el valor de `trap` es 0x0000000d que se corresponde con el decimal 13. El `trap` con dicho número es "General Protection" que es causado por "Any memory reference and other protection checks". Esto es diferente a la que se invocó en el programa (14 = page fault). Esto se debe a que en el llamado de la interrupción 14 en `softint.c` se tiene privilegios de modo usuario, mientras que dicha interrupción en el archivo `trap.c`, `SETGATE(idt[T_PGFLT], 0, GD_KT, trap_14, 0);` fue declarada con un nivel de privilegio 0 (el quinto argumento) lo que quiere decir que solo el kernel puede transferir la ejecución a esa interrupción. Si se intenta violar esta regla ocurre una excepción `General Protection` (13) que es justamente la que ocurre.
+
+
+user_evilhello
+--------------
+
+Tenemos la primer versión del programa `evihello.c`:
+```
+// evil hello world -- kernel pointer passed to kernel
+// kernel should destroy user environment in response
+
+#include <inc/lib.h>
+
+void
+umain(int argc, char **argv)
+{
+	// try to print the kernel entry point as a string!  mua ha ha!
+	sys_cputs((char*)0xf010000c, 100);
+}
+```
+Con el cual tenemos la siguiente salida:
+```
+[00000000] new env 00001000
+Incoming TRAP frame at 0xefffffbc
+f�rIncoming TRAP frame at 0xefffffbc
+[00001000] exiting gracefully
+[00001000] free env 00001000
+Destroyed the only environment - nothing more to do!
+```
+
+Mientras que con la siguiente versión:
+```
+#include <inc/lib.h>
+
+void
+umain(int argc, char **argv)
+{
+    char *entry = (char *) 0xf010000c;
+    char first = *entry;
+    sys_cputs(&first, 1);
+}
+```
+
+Tenemos la siguiente salida:
+```
+[00000000] new env 00001000
+Incoming TRAP frame at 0xefffffbc
+[00001000] user fault va f010000c ip 00800039
+TRAP frame at 0xf01c0000
+  edi  0x00000000
+  esi  0x00000000
+  ebp  0xeebfdfd0
+  oesp 0xefffffdc
+  ebx  0x00000000
+  edx  0x00000000
+  ecx  0x00000000
+  eax  0x00000000
+  es   0x----0023
+  ds   0x----0023
+  trap 0x0000000e Page Fault
+  cr2  0xf010000c
+  err  0x00000005 [user, read, protection]
+  eip  0x00800039
+  cs   0x----001b
+  flag 0x00000082
+  esp  0xeebfdfb0
+  ss   0x----0023
+[00001000] free env 00001000
+Destroyed the only environment - nothing more to do!
+```
+1. ¿En qué se diferencia el código de la versión en `evilhello.c` mostrada arriba?
+En la segunda versión primero se intenta acceder explícitamente a la dirección `0xf010000c` desde la aplicación de usuario. Dado que esta memoria pertenece al kernel, ocurre aquí el page fault.
+
+2. ¿En qué cambia el comportamiento durante la ejecución? ¿Por qué? ¿Cuál es el mecanismo?
+Como vemos para la segunda versión el proceso es destruído a causa del Page Fault. Pero para el primer caso simplemente se le pasa la dirección al kernel y dicha dirección será accedida en modo kernel dentro del handler de la syscall, por ello es que no ocurre ningún Page Fault y el programa termina correctamente. Por esto es necesario que el kernel valide los punteros que envía el usuario como argumentos de las syscalls.
+
+
+
