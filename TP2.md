@@ -455,6 +455,4 @@ TRAP frame at 0xf01c0000
 Destroyed the only environment - nothing more to do!
 ```
 
-Puede oservarse que el valor de `trap` es 0x0000000d que se corresponde con el decimal 13. El `trap` con dicho número es "General Protection" que es causado por "Any memory reference and other protection checks". Esto es diferente a la que se invocó en el programa (14 = page fault).
-
-¿Por qué? No sé xD
+Puede oservarse que el valor de `trap` es 0x0000000d que se corresponde con el decimal 13. El `trap` con dicho número es "General Protection" que es causado por "Any memory reference and other protection checks". Esto es diferente a la que se invocó en el programa (14 = page fault). Esto se debe a que en el llamado de la interrupción 14 en `softint.c` se tiene privilegios de modo usuario, mientras que dicha interrupción en el archivo `trap.c`, `SETGATE(idt[T_PGFLT], 0, GD_KT, trap_14, 0);` fue declarada con un nivel de privilegio 0 (el quinto argumento) lo que quiere decir que solo el kernel puede transferir la ejecución a esa interrupción. Si se intenta violar esta regla ocurre una excepción `General Protection` (13) que es justamente la que ocurre
