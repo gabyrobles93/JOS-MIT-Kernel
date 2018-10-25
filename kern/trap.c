@@ -218,7 +218,7 @@ trap_dispatch() va a tener un switch para cada excepcion posible:
 	}	
 
 En este switch vamos a tener manejadores para el T_BRKPT y para T_PGFLT 
-(breackpoint y page fault), para el resto nose hará nada y se volverá al 
+(breakpoint y page fault), para el resto nose hará nada y se volverá al 
 proceso original.
 
 Además, la excepción de breakpoint se debe poder lanzar desde programas de usuario. 
