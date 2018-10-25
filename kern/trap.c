@@ -47,6 +47,8 @@ extern void trap_18();
 extern void trap_19();
 extern void trap_20();
 
+extern void trap_48();
+
 static const char *
 trapname(int trapno)
 {
@@ -137,6 +139,9 @@ trap_init(void)
 	SETGATE(idt[T_SIMDERR], 0, GD_KT, trap_19, 0);
 	// Virtualization Exception
 	SETGATE(idt[20], 0, GD_KT, trap_20, 0);
+
+	// SYSCALL interrupt
+	SETGATE(idt[48], 0, GD_KT, trap_48, 3);
 
 	// Per-CPU setup
 	trap_init_percpu();
@@ -238,6 +243,18 @@ trap_dispatch(struct Trapframe *tf)
 		}
 		case T_PGFLT: {
 			page_fault_handler(tf);
+			return;
+		}
+		case T_SYSCALL: {
+			uint32_t ret = syscall(
+				tf->tf_regs.reg_eax, // Syscall number
+				tf->tf_regs.reg_edx, // 1st argument
+				tf->tf_regs.reg_ecx, // 2nd argument
+				tf->tf_regs.reg_ebx, // 3rd argument
+				tf->tf_regs.reg_edi, // 4th argument
+				tf->tf_regs.reg_esi  // 5th argument
+			);
+			tf->tf_regs.reg_eax = ret; // Return value should be put in %eax
 			return;
 		}
 		default:
