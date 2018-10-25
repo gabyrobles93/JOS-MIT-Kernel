@@ -419,13 +419,13 @@ kern_idt
 
 1. ¿Cómo decidir si usar TRAPHANDLER o TRAPHANDLER_NOEC? ¿Qué pasaría si se usara solamente la primera?
 
-Para decidir si usar una u la otra, se debe analizar para cada excepción/interrupción, si para esta el CPU automáticamente hace un push al stack del código de error o no. Para el primer caso se debe utilizar la macro TRAPHANDLER y lara el segundo TRAPHANDLER_NOEC. Se se utilizara solamente la primera, en los casos de excepciones/interrupciones donde el cpu no haga push del código de error, el stack basado en el trapframe estaría con un formáto inválido, desencadenando en errores graves.
+Para decidir si usar una u la otra, se debe analizar para cada excepción/interrupción, si para esta el CPU automáticamente hace un push al stack del código de error o no. Para el primer caso se debe utilizar la macro `TRAPHANDLER` y para el segundo `TRAPHANDLER_NOEC`. Si se utilizara solamente la primera, en los casos de excepciones/interrupciones donde el CPU no haga `push` del código de error, el stack basado en el trapframe estaría con un formato inválido, desencadenando en errores graves.
 
-2. ¿Qué cambia, en la invocación de handlers, el segundo parámetro (istrap) de la macro SETGATE? ¿Por qué se elegiría un comportamiento u otro durante un syscall?
+2. ¿Qué cambia, en la invocación de handlers, el segundo parámetro (istrap) de la macro `SETGATE`? ¿Por qué se elegiría un comportamiento u otro durante un syscall?
 
-Con el valor istrap = 0, la cpu deshabilita las interrupciones cuando se está en modo kernel. Con istrap = 1, la cpu no las desactiva. En JOS, no se considerará que el CPU tome interripciones cuando se esté en modo kerel. Otros kernels mas avanzados podrían ponerlo a 1.
+Con el valor `istrap = 0`, el CPU deshabilita las interrupciones cuando se está en modo kernel. Con `istrap = 1`, el CPU no las desactiva. En `JOS`, no se considerará que el CPU tome interripciones cuando se esté en modo kernel. Otros kernels más avanzados podrían ponerlo a 1.
 
-3. Leer user/softint.c y ejecutarlo con make run-softint-nox. ¿Qué excepción se genera? Si hay diferencias con la que invoca el programa… ¿por qué mecanismo ocurre eso, y por qué razones?
+3. Leer `user/softint.c` y ejecutarlo con `make run-softint-nox`. ¿Qué excepción se genera? Si hay diferencias con la que invoca el programa… ¿por qué mecanismo ocurre eso, y por qué razones?
 
 
 Al ejecutar `make run-softint-nox` se obtiene lo siguiente por salida estándar:
