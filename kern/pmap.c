@@ -715,6 +715,34 @@ int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 3: Your code here.
+	uintptr_t r_va = ROUNDDOWN((uintptr_t) va, PGSIZE);
+	uintptr_t r_va_plus_len = ROUNDUP((uintptr_t) (va + len), PGSIZE);
+
+	// Cálculo de la cantidad de paginas a checkear
+	size_t pages_to_check = (r_va_plus_len - r_va) / PGSIZE;
+
+	pte_t * pte;
+
+	while (pages_to_check) {
+		pte = pgdir_walk(env->env_pgdir, (void *)r_va, 0);
+		bool is_va_in_range = r_va < ULIM ? true : false;
+		bool valid_pde = (env->env_pgdir[PDX(r_va)] & (perm | PTE_P)) == (perm | PTE_P) ? true : false;
+		bool valid_pte = ((*pte) & (perm | PTE_P)) == (perm | PTE_P) ? true : false;
+		
+		if (is_va_in_range && valid_pde && valid_pte) {
+			pages_to_check--;
+			r_va += PGSIZE;
+		} else { // Failed permissions
+			user_mem_check_addr = (uintptr_t)va;
+    	if (user_mem_check_addr < r_va) {
+				// Por si fallamos en el primer checkeo
+				// tenemos el valor del ROUNDOWN y deberiamos
+				// devolver va en ese caso
+				user_mem_check_addr = r_va;
+			} 
+			return -E_FAULT;
+		}
+	}
 
 	return 0;
 }
