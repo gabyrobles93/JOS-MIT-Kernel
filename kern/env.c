@@ -11,11 +11,14 @@
 #include <kern/pmap.h>
 #include <kern/trap.h>
 #include <kern/monitor.h>
+#include <kern/sched.h>
+#include <kern/cpu.h>
+#include <kern/spinlock.h>
 
 // Arreglo de procesos (variable global, de longitud NENV).
-struct Env *envs = NULL;           // All environments
+struct Env *envs = NULL;  // All environments
 // Proceso actualmente en ejecución (inicialmente NULL).
-struct Env *curenv = NULL;         // The current env
+struct Env *curenv = NULL;  // The current env
 // Lista enlazada de `struct Env` libres.
 static struct Env *env_free_list;  // Free environment list
                                    // (linked by Env->env_link)
@@ -37,7 +40,7 @@ static struct Env *env_free_list;  // Free environment list
 // definition of gdt specifies the Descriptor Privilege Level (DPL)
 // of that descriptor: 0 for kernel and 3 for user.
 //
-struct Segdesc gdt[] = {
+struct Segdesc gdt[NCPU + 5] = {
 	// 0x0 - unused (always faults -- for trapping NULL far pointers)
 	SEG_NULL,
 
@@ -53,7 +56,8 @@ struct Segdesc gdt[] = {
 	// 0x20 - user data segment
 	[GD_UD >> 3] = SEG(STA_W, 0x0, 0xffffffff, 3),
 
-	// 0x28 - tss, initialized in trap_init_percpu()
+	// Per-CPU TSS descriptors (starting from GD_TSS0) are initialized
+	// in trap_init_percpu()
 	[GD_TSS0 >> 3] = SEG_NULL
 };
 
@@ -117,14 +121,14 @@ env_init(void)
 {
 	// Set up envs array
 	// LAB 3: Your code here.
-  for (int i = NENV - 1 ; i >= 0 ; i--) {
-    envs[i].env_link = env_free_list;
-    // envs[i].env_id = 0; // Hecho por memset
-    // envs[i].env_status = ENV_FREE // Hecho por memset
-    env_free_list = &envs[i];
-  } 
+	for (int i = NENV - 1; i >= 0; i--) {
+		envs[i].env_link = env_free_list;
+		// envs[i].env_id = 0; // Hecho por memset
+		// envs[i].env_status = ENV_FREE // Hecho por memset
+		env_free_list = &envs[i];
+	}
 
-	
+
 	// Per-CPU part of the initialization
 	env_init_percpu();
 }
@@ -187,24 +191,24 @@ env_setup_vm(struct Env *e)
 	//    - The functions in kern/pmap.h are handy.
 
 	// LAB 3: Your code here.
- 
+
 	// page alloc aloca la página pero me devuelve un puntero a
 	// PageInfo que es metadata asociada a una página física
 	// Con page2pa obtengo la dirección física del comienzo de la página
 	// y con KADDR obtengo la Kernel Virtual Address (pde_t *)
-  // Podemos usar page2kva porque el arreglo de pages fue mapeado
-  // en la kernel virtual address
-	e->env_pgdir = (pde_t *) page2kva(p); 
+	// Podemos usar page2kva porque el arreglo de pages fue mapeado
+	// en la kernel virtual address
+	e->env_pgdir = (pde_t *) page2kva(p);
 	// Page alloc no incrementa pp_ref, esto debe hacerlo el caller
 	// en la siguiente línea incrementamos pp_ref de PageInfo
 	p->pp_ref++;
 	// Ahora se debe copiar el Page Directory del kernel (kern_pgdir)
 	// por encima de UTOP en el Page Directory del nuevo environment
 	// Se podría copiar desde kern_pgdir[PDX(UTOP)] hasta kern_pgdir[1023]
-	// Pero dado que no se hizo ningún mapeo por debajo de UTOP en kern_pgdir, 
-	// todos los PDE de kern_pgdir por debajo de este punto están en 0
-	// Por lo tanto se puede usar kern_pgdir como template y copiarlo
-	// tal cual está entero
+	// Pero dado que no se hizo ningún mapeo por debajo de UTOP en
+	// kern_pgdir, todos los PDE de kern_pgdir por debajo de este punto
+	// están en 0 Por lo tanto se puede usar kern_pgdir como template y
+	// copiarlo tal cual está entero
 	memcpy(e->env_pgdir, kern_pgdir, PGSIZE);
 
 
@@ -270,6 +274,15 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	e->env_tf.tf_cs = GD_UT | 3;
 	// You will set e->env_tf.tf_eip later.
 
+	// Enable interrupts while in user mode.
+	// LAB 4: Your code here.
+
+	// Clear the page fault handler until user installs one.
+	e->env_pgfault_upcall = 0;
+
+	// Also clear the IPC receiving flag.
+	e->env_ipc_recving = 0;
+
 	// commit the allocation
 	env_free_list = e->env_link;
 	*newenv_store = e;
@@ -299,13 +312,14 @@ region_alloc(struct Env *e, void *va, size_t len)
 	// Como pide, se redondea va hacia abajo y va+len hacia arriba
 	// a múltiplos de PGSIZE
 	uintptr_t r_va = ROUNDDOWN((uintptr_t) va, PGSIZE);
-	uintptr_t r_va_plus_len = ROUNDUP((uintptr_t) (va+len), PGSIZE);
+	uintptr_t r_va_plus_len = ROUNDUP((uintptr_t)(va + len), PGSIZE);
 
 	// Cálculo de la cantidad de páginas a alocar
 	size_t pages_to_create = (r_va_plus_len - r_va) / PGSIZE;
 
 	while (pages_to_create) {
-		struct PageInfo * p = page_alloc(0); // Indica explicitamente que no se deben poner a cero las paginas.
+		struct PageInfo *p = page_alloc(
+		        0);  // Indica explicitamente que no se deben poner a cero las paginas.
 		if (p == NULL) {
 			panic("region_alloc: Can't allocate page.\n");
 		}
@@ -344,7 +358,7 @@ load_icode(struct Env *e, uint8_t *binary)
 {
 	// Hints:
 	//  Load each program segment into virtual memory
-	//  at the address specified in the ELF section header.
+	//  at the address specified in the ELF segment header.
 	//  You should only load segments with ph->p_type == ELF_PROG_LOAD.
 	//  Each segment's virtual address can be found in ph->p_va
 	//  and its size in memory can be found in ph->p_memsz.
@@ -373,26 +387,37 @@ load_icode(struct Env *e, uint8_t *binary)
 	// LAB 3: Your code here.
 
 	// binary es un puntero a un binario Elf
-	struct Elf * elf = (struct Elf *) binary;
+	struct Elf *elf = (struct Elf *) binary;
 
 	// Recupero información útil del Elf
-	uint32_t program_headers_offset = elf->e_phoff; // Offset de los program headers dentro del Elf
-	uint32_t program_headers_num = elf->e_phnum; // Cantidad de segmentos...
+	uint32_t program_headers_offset =
+	        elf->e_phoff;  // Offset de los program headers dentro del Elf
+	uint32_t program_headers_num = elf->e_phnum;  // Cantidad de segmentos...
 
-	// Cambiamos la page directory seteada en el CPU a la page directory del environment a configurar.
-	// Esto es para poder utilizar memset y memcopy
+	// Cambiamos la page directory seteada en el CPU a la page directory del
+	// environment a configurar. Esto es para poder utilizar memset y
+	// memcopy
 	lcr3(PADDR(e->env_pgdir));
 	for (int i = 0; i < program_headers_num; i++) {
 		// Recuperamos el program header
-		struct Proghdr * program_header = (struct Proghdr *) (binary + program_headers_offset + (i * sizeof(struct Proghdr)));
+		struct Proghdr *program_header =
+		        (struct Proghdr *) (binary + program_headers_offset +
+		                            (i * sizeof(struct Proghdr)));
 		// Si no es de tipo "ELF_PROG_LOAD" se debe descartar
-		if (program_header->p_type != ELF_PROG_LOAD) continue;
+		if (program_header->p_type != ELF_PROG_LOAD)
+			continue;
 		// Reservamos memsz bytes de memoria con region_alloc() en la dirección va del segmento
-		region_alloc(e, (void *) program_header->p_va, program_header->p_memsz);
+		region_alloc(e,
+		             (void *) program_header->p_va,
+		             program_header->p_memsz);
 		// Copiamos filesz bytes desde binary + offset a va
-		memcpy((void *) program_header->p_va, binary + program_header->p_offset, program_header->p_filesz);
+		memcpy((void *) program_header->p_va,
+		       binary + program_header->p_offset,
+		       program_header->p_filesz);
 		// Escribimos en 0 el resto de bytes, desde va+filesz hasta va+memsz
-		memset((void *) (program_header->p_va + program_header->p_filesz), 0, program_header->p_memsz - program_header->p_filesz);
+		memset((void *) (program_header->p_va + program_header->p_filesz),
+		       0,
+		       program_header->p_memsz - program_header->p_filesz);
 	}
 	// Restauramos en el CPU la page directory del kernel
 	lcr3(PADDR(kern_pgdir));
@@ -404,7 +429,7 @@ load_icode(struct Env *e, uint8_t *binary)
 	// at virtual address USTACKTOP - PGSIZE.
 
 	// LAB 3: Your code here.
-	
+
 	region_alloc(e, (void *) (USTACKTOP - PGSIZE), PGSIZE);
 }
 
@@ -419,12 +444,13 @@ void
 env_create(uint8_t *binary, enum EnvType type)
 {
 	// LAB 3: Your code here.
-	struct Env * new_env = NULL;
+	struct Env *new_env = NULL;
 	int errcode;
 	// Alocamos un nuevo env con env_alloc
 	errcode = env_alloc(&new_env, 0);
 	if (errcode < 0) {
-		panic("env_create failed in 'env_alloc' with error code: %e\n", errcode);
+		panic("env_create failed in 'env_alloc' with error code: %e\n",
+		      errcode);
 	}
 
 	// Cargamos el biario en el env con load_icode
@@ -433,8 +459,8 @@ env_create(uint8_t *binary, enum EnvType type)
 	// Seteamos el env_type
 	new_env->env_type = type;
 
-  // Seteamos el parent ID
-  new_env->env_parent_id = 0;
+	// Seteamos el parent ID
+	new_env->env_parent_id = 0;
 }
 
 //
@@ -491,15 +517,26 @@ env_free(struct Env *e)
 
 //
 // Frees environment e.
+// If e was the current env, then runs a new environment (and does not return
+// to the caller).
 //
 void
 env_destroy(struct Env *e)
 {
+	// If e is currently running on other CPUs, we change its state to
+	// ENV_DYING. A zombie environment will be freed the next time
+	// it traps to the kernel.
+	if (e->env_status == ENV_RUNNING && curenv != e) {
+		e->env_status = ENV_DYING;
+		return;
+	}
+
 	env_free(e);
 
-	cprintf("Destroyed the only environment - nothing more to do!\n");
-	while (1)
-		monitor(NULL);
+	if (curenv == e) {
+		curenv = NULL;
+		sched_yield();
+	}
 }
 
 
@@ -512,6 +549,9 @@ env_destroy(struct Env *e)
 void
 env_pop_tf(struct Trapframe *tf)
 {
+	// Record the CPU we are running on for user-space debugging
+	curenv->env_cpunum = cpunum();
+
 	asm volatile("\tmovl %0,%%esp\n"
 	             "\tpopal\n"
 	             "\tpopl %%es\n"
@@ -567,12 +607,13 @@ env_run(struct Env *e)
 	curenv->env_runs++;
 
 	// Seteamos el address space del nuevo proceso
-	// No volvemos a setear el address space del kernel pues luego de que termine
-	// Esta función ya se terminó el context switch y estaremos ejecutando
-	// Un proceso de usuario!
+	// No volvemos a setear el address space del kernel pues luego de que
+	// termine Esta función ya se terminó el context switch y estaremos
+	// ejecutando Un proceso de usuario!
 	lcr3(PADDR(e->env_pgdir));
 
-	// Usamos env_pop_tf() para restaurar los registros del environment y volver al modo usuario (salir del modo kernel)
+	// Usamos env_pop_tf() para restaurar los registros del environment y
+	// volver al modo usuario (salir del modo kernel)
 	env_pop_tf(&(e->env_tf));
 
 	// panic("env_run not yet implemented");
