@@ -397,7 +397,7 @@ page_init(void)
 		if (
 			paddr >= PADDR(boot_alloc(0)) ||
 		  paddr < IOPHYSMEM ||
-			paddr == MPENTRY_PADDR
+			paddr != MPENTRY_PADDR
 			) {  // Si no es una dirección prohibida
 			// pages[i].pp_ref = 0; // Fue seteado con memset
 			pages[i].pp_link = page_free_list;
