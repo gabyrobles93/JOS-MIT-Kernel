@@ -795,7 +795,21 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// Hint: The staff solution uses boot_map_region.
 	//
 	// Your code here:
-	panic("mmio_map_region not implemented");
+	// Redondeamos size para arriba a un multiplo de PGSIZE
+	size = ROUNDUP(size, PGSIZE);
+
+	// Checkeamos que no nos excedamos del limite
+	if (base + size > MMIOLIM) {
+		panic("mmio_map_region overflow MMIOLIM");
+	}
+
+	// Mapeamos con la funcion boot_map_region utilizando los permisos
+	// indicados para que el CPU no cachee los accesos a estas zonas de mem.
+	boot_map_region(kern_pgdir, base, size, pa, PTE_PCD | PTE_PWT | PTE_W);
+
+	// Actualizamos la variable base (estatica) y la retornamos
+	base += size;
+	return (void*)base;
 }
 
 static uintptr_t user_mem_check_addr;
