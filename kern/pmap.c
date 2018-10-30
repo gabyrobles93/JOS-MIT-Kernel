@@ -807,9 +807,11 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// indicados para que el CPU no cachee los accesos a estas zonas de mem.
 	boot_map_region(kern_pgdir, base, size, pa, PTE_PCD | PTE_PWT | PTE_W);
 
-	// Actualizamos la variable base (estatica) y la retornamos
+	// Guardamos la base mapeada para ser retornada
+	// Actualizamos la variable base (estatica)
+	uintptr_t ret = base;
 	base += size;
-	return (void*)base;
+	return (void*)ret;
 }
 
 static uintptr_t user_mem_check_addr;
