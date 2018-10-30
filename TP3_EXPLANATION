@@ -1,0 +1,91 @@
+TP3: MULTIPLES PROCESOS DE USUARIO DE MANERA RECURRENTE
+
+Necesitamos un planificador (SCHEDULER).
+
+¿Cómo crear procesos?
+
+|MULTI - CPU| 
+
+PARTE 1
+
+Hay un reloj que se configura para que interrumpa periodicamente y le de el control al s.o.
+Las tareas timer_irq y timer_preempt se encargan de eso.
+
+Cada vez que se ejecute la interrupcion del reloj, esas tareas van a llamar al planificador para que cambie de proceso.
+
+El planificador será Round Robin, bien sencillo, que dada la lista de 1024 envs, arrancará en el proceso actual y avanzará
+hacia adelante buscando el siguiente proceso que está en estado RUNNABLE.
+
+En el planificador: curenv => next available (y llamar a la función env_run())
+
+No empezar siempre por el indice 0 del arreglo, sino siempre le daremos oportunidades a los primeros.
+Lo que se hace es agarrar curenv, fijarnos donde esta en el arreglo, y empezar a schedulear a partir del siguiente.
+Eso hace que sea un round robin efectivamente.
+
+env_run() no devuelve nunca, pasa a modo usuario, y para que ese modo usuario termine lo tiene que destruir el kernel en modo kernel.
+
+Syscall asociada: sys_yield	Permite que un proceso de usuario se saque a si mismo de la cpu.
+
+---------------------------------
+tarea: timer_irq
+En modo kernel no vamos a aceptar ninguna interrupcion ni siquiera la del reloj. Eso se maneja en el campo istrap del SETGATE. En JOS todas estarán en 0, para desactivar interrupciones en modo kernel. Se habilitan de nuevo en modo usuario. 
+
+Nosotros no somos los que vamos a activar y desactivar interrupciones al entrar y salir del kernel, esto se hace automático con el parámetro istrap. Hay un FLAG en el campo EFLAGS que marca si estan habilitadas o no. Al restaurar EFLAGS, se restaura ese flag.
+
+punto 3: Hay que habilitar en el EFLAG de un nuevo proceso creado, poner el flag de interrupciones a 1.
+	Hay que setear el flag FL_IF en env_alloc (ESTO ES UNA SOLA LINEA XDD GRACIAS DATO)
+
+----------------------------------
+tarea: sched_yield: planificador que permite cambiar de proceso. son 10 líneas un ciclo for buscando un proceso que se pueda ejecutar y ejecutarlo
+----------------------------------
+tarea: timer_preempt
+lapic_eoi() : Cuando hay interrupciones externas, hay que indicarle al dispositivo que la recibí y la estoy manejando. Se le indica al hardware que el S.O. tomó la interrupción.
+----------------------------------
+
+En trapentry.S hay que llamar al handler, se debe llamar con NOEC.
+
+Que pasa cuando termina main de proceso de usuario -> En lib/entry.S comienzan a ejecutarse los procesos. En un momento hay un call libmain que hace un par de cositas y luego llama a umain (lib/libmain.c) y luego a exit().
+
+TOTAL PARTE 1: 28 líneas de código.
+
+PARTE 2
+¿Cómo crear procesos? : FORK
+En JOS que es un exokernel, existe una syscall que se llama Sys_exofork.
+A crea B, el padre de B es A, B tiene otro envid, se hace una copia de los registros, pero NO SE HACE UNA COPIA DEL ESPACIO DE DIRECCIONES DEL PADRE. 
+
+JOS da un numero de syscall para que el proceso padre pueda configurar el address space del proceso hijo (Por eso exokernel, es medio vacio para que lo implemente el usuario). Por ejemplo: alocar una página del padre al hijo, mapear una pagina entre padre e hijo (para que la compartan).
+	sys_env_set_status()
+	..
+	..
+	..
+	lo que hacen es verificar permisos etc.. y despues llaman a funciones del kernel (ej: env_alloc)
+
+dumbfork: ya está implemetnado, llama a exofork y para todo el código del programa, duplica la página, y el stack también (duppage).
+duppage: es llamada desde el padre para configurar al hijo. Queremos copiar todo el espacio de direcciones en nustor hijo, pues el hijo esta vacio. Alocamos una pagina en la direccion que nos dicen, y queremos copiar lo que hay en una direccion, en esa direccion del hijo (UTEMP es una direccion temporal). Con memove copio de mi direccion a la tempora y luego me la mapeo a mi mismo.
+
+Tres versiones de Fork:
+	DUMP (ya esta hecha)
+	V0	(Parte 2)
+	COW	(Parte 5)
+
+en V0, vamos a hacer una version parecida a la DUMP, pero que se de cuenta que si una pagina es de solo lectura haga que se pueda compartir. Si es de escritura entonces la copiará (no la compartirá).
+En COW, que se hara en la parte 5, haremos tambien que se pueda compartir lo que es sólo escritura.
+
+
+Parte 3: Ejecucion en paralelo multi core
+Va a haber una cpu que arranca primero e inicializa el sistema y se encarga de arrancar las demás, con una función en kern/init.c que se llama lapic_init (para iniciar interrupciones) y mp_init (para encontrar cpus hay e inicializarlas, máximo 8). Esto no nos interesa xD. bppt_aps, una vez detectado los procesadores adicionales, los pone a hacer trabajo, arranca una cpu con tal código, y le pasa el código. entry.S tiene el codigo que arranca la cpu, en kern/mpentry.S hace algo parecido, activa la memoria virtual, configura el stack, etc.. La cpu arranca en modo real, entonces, nosotros tenemos el codigo de la cpu cargado en memoria y están arriba en las direcciones altas, pero la cpu nueva no la puedo ejecutar ahi xq todavia no tiene paginado ni memoria virtual activada, pero ya no está abajo porque cuando haciamos el salto de entry page directory al posta del kernel, el kernel ya no tenia los mappings bajos. mp_main tiene la rutina para inicializar un cpu. En mp_main, hay que borrar el for infinito y usar ese espacio para llamar al scheduler.
+
+Tarea kernel_lock
+
+Puede ocurrir que dos procesos de usuario terminen a la vez entonces se vuelve al kernell en dos cpus a la vez (kernel concurrente en mas de una cpu). Modo kernel en dos cpus distintos es algo que no queremos. Necesitamos primitivas para mutual exclusion. 
+En JOS hay un sólo lock gigante, cuando entro al kernel lo agarro y cuando salgo lo suelto. Si hay 2 cpus con el kernel, uno de ellos estara en busy wait. Todas las veces que se entra en el kernel hay que adquirir ese log. 
+
+
+Cosa a tener en cuenta: cuando hay interripcion se ejecuta el handler, sobre el stack del kernel. EN pmap.c haciamos un boot_map_region, ahora hay que hacerlo para cada CPU (guiarse mirando cada stack de cada cpu en memmap.h).
+
+Tarea mem_init_mp
+Stacks de la cpu. Se hace un ciclo para que el procesador 0 mapee en el page directory el espacio de CADA CPU, por eso el ciclo for. 
+trap_init_percpu -> cada cpu tiene que llamarlo. 
+
+
+
