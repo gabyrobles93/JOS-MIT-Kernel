@@ -29,6 +29,29 @@ sched_yield(void)
 	// below to halt the cpu.
 
 	// LAB 4: Your code here.
+	size_t curenv_idx = 0;
+
+	// Checkeamos si curenv no es NULL si es asi arrancamos
+	// por el indice 0 del arreglo envs
+	if (curenv) {
+		curenv_idx = ENVX(curenv->env_id);
+	}
+
+	// Recorremos circularmente el arreglo envs
+	for (size_t i = 0 ; i < NENV ; i++) {
+		// Tomamos el modulo para hacer el recorrido circular
+		idle = envs + ((curenv_idx + i) % NENV);
+		// Checkeamos el primer proceso en RUNNABLE
+		if (idle->env_status == ENV_RUNNABLE) {
+			env_run(idle);
+		}
+	}
+
+	// Si no habia ningun proceso runnable checkeamos
+	// por el proceso actual si es que existe
+	if (curenv && curenv->env_status == ENV_RUNNING) {
+		env_run(curenv);
+	}
 
 	// sched_halt never returns
 	sched_halt();
