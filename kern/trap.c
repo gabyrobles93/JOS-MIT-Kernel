@@ -281,6 +281,11 @@ trap_dispatch(struct Trapframe *tf)
 		page_fault_handler(tf);
 		return;
 	}
+	case IRQ_OFFSET + IRQ_TIMER: {
+		lapic_eoi(); 		// Avisamos al hardware que atrapamos la interrupcion
+		sched_yield(); 	// Actuamos en consecuencia de la interrupcion (round-robin)
+		return;
+	}
 	case T_SYSCALL: {
 		uint32_t ret = syscall(tf->tf_regs.reg_eax,  // Syscall number
 		                       tf->tf_regs.reg_edx,  // 1st argument
