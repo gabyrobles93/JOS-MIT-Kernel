@@ -84,7 +84,21 @@ sys_exofork(void)
 	// will appear to return 0.
 
 	// LAB 4: Your code here.
-	panic("sys_exofork not implemented");
+	struct Env * new_env;
+	// Creamos un nuevo proceso y el padre sera el proceso actual
+	int ret = env_alloc(&new_env, curenv->env_id);
+	// Comprobamos errores de env_alloc
+	if (ret < 0) return (envid_t)ret;
+	// Actualizamos el estado del nuevo proceso
+	new_env->env_status = ENV_NOT_RUNNABLE;
+	// Copiamos el trap frame del padre
+	memcpy(&new_env->env_tf, &curenv->env_tf, sizeof(struct Trapframe));
+	// Forzamos 0 en EAX del hijo asi quien llama a exofork
+	// puede diferenciar entre hijo y padre (pues en EAX esta
+	// lo que devuelve la syscall)
+	new_env->env_tf.tf_regs.reg_eax = 0;
+	// Retornamos el env_id del proceso creado
+	return new_env->env_id;
 }
 
 // Set envid's env_status to status, which must be ENV_RUNNABLE
@@ -104,7 +118,20 @@ sys_env_set_status(envid_t envid, int status)
 	// envid's status.
 
 	// LAB 4: Your code here.
-	panic("sys_env_set_status not implemented");
+	struct Env * env;
+	// Pasamos envid a struct Env
+	// Ponemos el checkeo de permisos en true
+	// que comprueba que el envid pasado
+	// corresponde a currenv o a un hijo 
+	// inmediato de currenv.
+	int ret = envid2env(envid, &env, true);
+	// Comprobamos errores
+	if (ret < 0) return ret;
+	// Comprobamos status a setear validos
+	if (status != ENV_RUNNABLE && status != ENV_NOT_RUNNABLE) return -E_INVAL;
+	// Si pasamos las validaciones seteamos el status y retornamos
+	env->env_status = status;
+	return 0;
 }
 
 // Set the page fault upcall for 'envid' by modifying the corresponding struct
