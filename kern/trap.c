@@ -52,6 +52,8 @@ extern void trap_18();
 extern void trap_19();
 extern void trap_20();
 
+extern void trap_32();
+
 extern void trap_48();
 
 static const char *
@@ -146,6 +148,9 @@ trap_init(void)
 	SETGATE(idt[T_SIMDERR], 0, GD_KT, trap_19, 0);
 	// Virtualization Exception
 	SETGATE(idt[20], 0, GD_KT, trap_20, 0);
+
+	// Timer interruption
+	SETGATE(idt[IRQ_OFFSET + IRQ_TIMER], 0, GD_KT, trap_32, 0);
 
 	// SYSCALL interrupt
 	SETGATE(idt[48], 0, GD_KT, trap_48, 3);
