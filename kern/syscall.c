@@ -244,7 +244,41 @@ sys_page_map(envid_t srcenvid, void *srcva, envid_t dstenvid, void *dstva, int p
 	//   check the current permissions on the page.
 
 	// LAB 4: Your code here.
-	panic("sys_page_map not implemented");
+	// Variables
+	struct Env *src_env, *dst_env;
+	struct PageInfo * page;
+	pte_t * pte;
+	int error = 0;
+
+	// Pasamos envid's a struct Env's
+	// Y comprobamos de igual manera 
+	// que en sys_env_set_status
+	error = envid2env(srcenvid, &src_env, true);
+	if (error) return error;
+	error = envid2env(dstenvid, &dst_env, true);
+	if (error) return error;
+
+	// Validamos va's
+	if ((uintptr_t)srcva % PGSIZE || srcva >= UTOP) return -E_INVAL;
+	if ((uintptr_t)dstva % PGSIZE || dstva >= UTOP) return -E_INVAL;
+
+	// Validamos que srcva este mapeado en src_env Address Space
+	page = page_lookup(src_env->env_pgdir, srcva, &pte);
+	if (page == NULL) return -E_INVAL;
+
+	// Validamos permisos
+	// Idem page alloc
+	if (perm & ~(PTE_SYSCALL) || (perm & (PTE_U | PTE_P) != (PTE_U | PTE_P))) return -E_INVAL;
+
+	// Verificamos que no sea una pagina de solo lectura
+	// y se la este intentando mapear con permisos de escritura
+	if ((*pte & PTE_W == 0) && (perm & PTE_W)) return -E_INVAL;
+
+	// Mapeamos la pagina y validamos errores
+	error = page_insert(dst_env->env_pgdir, page, dstva, perm);
+	if (error) return error; 	 // -E_NO_MEM
+	
+	return 0;
 }
 
 // Unmap the page of memory at 'va' in the address space of 'envid'.
