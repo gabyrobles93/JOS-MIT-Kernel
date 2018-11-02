@@ -12,6 +12,14 @@
 #include <kern/console.h>
 #include <kern/sched.h>
 
+// Funcion propia para validar direcciones
+// de memoria virtual pasadas a la syscall
+static int
+check_va(const void * va) {
+	uintptr_t casted = (uintptr_t)va;
+	if ((casted % PGSIZE) || casted >= UTOP) return -E_INVAL;
+}
+
 // Print a string to the system console.
 // The string is exactly 'len' characters long.
 // Destroys the environment on memory errors.
@@ -195,12 +203,14 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 	if (error) return error; // -E_BAD_ENV
 
 	// Validamos va
-	if ((uintptr_t)va % PGSIZE || va >= UTOP) return -E_INVAL;
+	error = check_va(va);
+	if (error) return error;
+	
 
 	// Validamos permisos
 	// Primero comprobamos que no tengan permisos invalidos
 	// Segundo comprobamos que los mandatorios esten seteados
-	if (perm & ~(PTE_SYSCALL) || (perm & (PTE_U | PTE_P) != (PTE_U | PTE_P))) return -E_INVAL;
+	if (perm & ~(PTE_SYSCALL) || ((perm & (PTE_U | PTE_P)) != (PTE_U | PTE_P))) return -E_INVAL;
 
 	// Alocamos la pagina y validamos que haya memoria
 	page = page_alloc(ALLOC_ZERO);
@@ -259,8 +269,10 @@ sys_page_map(envid_t srcenvid, void *srcva, envid_t dstenvid, void *dstva, int p
 	if (error) return error;
 
 	// Validamos va's
-	if ((uintptr_t)srcva % PGSIZE || srcva >= UTOP) return -E_INVAL;
-	if ((uintptr_t)dstva % PGSIZE || dstva >= UTOP) return -E_INVAL;
+	error = check_va(srcva);
+	if (error) return error;
+	error = check_va(dstva);
+	if (error) return error;
 
 	// Validamos que srcva este mapeado en src_env Address Space
 	page = page_lookup(src_env->env_pgdir, srcva, &pte);
@@ -268,11 +280,11 @@ sys_page_map(envid_t srcenvid, void *srcva, envid_t dstenvid, void *dstva, int p
 
 	// Validamos permisos
 	// Idem page alloc
-	if (perm & ~(PTE_SYSCALL) || (perm & (PTE_U | PTE_P) != (PTE_U | PTE_P))) return -E_INVAL;
+	if (perm & ~(PTE_SYSCALL) || ((perm & (PTE_U | PTE_P)) != (PTE_U | PTE_P))) return -E_INVAL;
 
 	// Verificamos que no sea una pagina de solo lectura
 	// y se la este intentando mapear con permisos de escritura
-	if ((*pte & PTE_W == 0) && (perm & PTE_W)) return -E_INVAL;
+	if (((*pte & PTE_W) == 0) && (perm & PTE_W)) return -E_INVAL;
 
 	// Mapeamos la pagina y validamos errores
 	error = page_insert(dst_env->env_pgdir, page, dstva, perm);
@@ -302,7 +314,8 @@ sys_page_unmap(envid_t envid, void *va)
 	if (error) return error;
 
 	// Validamos va
-	if ((uintptr_t)va % PGSIZE || va >= UTOP) return -E_INVAL;
+	error = check_va(va);
+	if (error) return error;
 
 	// Validamos que alla pagina mapeada sino
 	// page_remove podria fallar en page_decref.
