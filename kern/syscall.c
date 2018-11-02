@@ -12,12 +12,25 @@
 #include <kern/console.h>
 #include <kern/sched.h>
 
+
+
+
 // Funcion propia para validar direcciones
 // de memoria virtual pasadas a la syscall
 static int
 check_va(const void * va) {
 	uintptr_t casted = (uintptr_t)va;
-	if ((casted % PGSIZE) || casted >= UTOP) return -E_INVAL;
+	if (PGOFF(casted) || casted >= UTOP) return -E_INVAL;
+	else return 0;
+}
+
+// Funcion propia para validar los permisos
+// Primero comprobamos que no tengan permisos invalidos
+// Segundo comprobamos que los mandatorios esten seteados
+static int
+check_permissions(int perm) {
+	if (perm & ~PTE_SYSCALL || ((perm & (PTE_U | PTE_P)) != (PTE_U | PTE_P))) return -E_INVAL;
+	else return 0;
 }
 
 // Print a string to the system console.
@@ -206,11 +219,9 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 	error = check_va(va);
 	if (error) return error;
 	
-
 	// Validamos permisos
-	// Primero comprobamos que no tengan permisos invalidos
-	// Segundo comprobamos que los mandatorios esten seteados
-	if (perm & ~(PTE_SYSCALL) || ((perm & (PTE_U | PTE_P)) != (PTE_U | PTE_P))) return -E_INVAL;
+	error = check_permissions(perm);
+	if (error) return error;
 
 	// Alocamos la pagina y validamos que haya memoria
 	page = page_alloc(ALLOC_ZERO);
@@ -280,7 +291,9 @@ sys_page_map(envid_t srcenvid, void *srcva, envid_t dstenvid, void *dstva, int p
 
 	// Validamos permisos
 	// Idem page alloc
-	if (perm & ~(PTE_SYSCALL) || ((perm & (PTE_U | PTE_P)) != (PTE_U | PTE_P))) return -E_INVAL;
+	// Validamos permisos
+	error = check_permissions(perm);
+	if (error) return error;
 
 	// Verificamos que no sea una pagina de solo lectura
 	// y se la este intentando mapear con permisos de escritura
@@ -317,7 +330,7 @@ sys_page_unmap(envid_t envid, void *va)
 	error = check_va(va);
 	if (error) return error;
 
-	// Validamos que alla pagina mapeada sino
+	// Validamos que haya pagina mapeada sino
 	// page_remove podria fallar en page_decref.
 	page = page_lookup(env->env_pgdir, va, NULL);
 	if (page == NULL) return 0; // "silently succeeds"
