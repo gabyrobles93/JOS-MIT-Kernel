@@ -119,18 +119,24 @@ sys_env_set_status(envid_t envid, int status)
 
 	// LAB 4: Your code here.
 	struct Env * env;
+
 	// Pasamos envid a struct Env
 	// Ponemos el checkeo de permisos en true
 	// que comprueba que el envid pasado
 	// corresponde a currenv o a un hijo 
 	// inmediato de currenv.
 	int ret = envid2env(envid, &env, true);
+
 	// Comprobamos errores
+
 	if (ret < 0) return ret;
+
 	// Comprobamos status a setear validos
 	if (status != ENV_RUNNABLE && status != ENV_NOT_RUNNABLE) return -E_INVAL;
+
 	// Si pasamos las validaciones seteamos el status y retornamos
 	env->env_status = status;
+
 	return 0;
 }
 
@@ -176,7 +182,39 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 	//   allocated!
 
 	// LAB 4: Your code here.
-	panic("sys_page_alloc not implemented");
+	// Variables
+	struct Env * env;
+	struct PageInfo * page;
+
+	// Pasamos envid a struct Env
+	// Y comprobamos de igual manera 
+	// que en sys_env_set_status
+	int error = envid2env(envid, &env, true);
+
+	// Comprobamos errores
+	if (error) return error; // -E_BAD_ENV
+
+	// Validamos va
+	if ((uintptr_t)va % PGSIZE || va >= UTOP) return -E_INVAL;
+
+	// Validamos permisos
+	// Primero comprobamos que no tengan permisos invalidos
+	// Segundo comprobamos que los mandatorios esten seteados
+	if (perm & ~(PTE_SYSCALL) || (perm & (PTE_U | PTE_P) != (PTE_U | PTE_P))) return -E_INVAL;
+
+	// Alocamos la pagina y validamos que haya memoria
+	page = page_alloc(ALLOC_ZERO);
+	if (page == NULL) return -E_NO_MEM;
+
+	// Mapeamos la pagina y validamos errores
+	error = page_insert(env->env_pgdir, page, va, perm);
+	if (error) {
+		page_free(page); // Liberamos la pagina (nunca se incremento pp_ref)
+		return error; 	 // -E_NO_MEM
+	}
+
+	// Success
+	return 0;
 }
 
 // Map the page of memory at 'srcva' in srcenvid's address space
