@@ -80,3 +80,28 @@ All done in environment 00001002.
 No runnable environments in the system!
 ```
 Se puede observar como se crean los tres procesos y en cada iteración cada proceso se desaloja intencionalmente. Primero arranca `00001000`, se desaloja, luego por `round-robin` irá el proceso siguiente `00001001`, entra al ciclo y se desaloja, por último empieza el ciclo el proceso `00001002` que se desaloja y por la política de `round-robin` ahora le tocará al proceso `00001000` nuevamente e imprime el primer mensaje por pantalla `"Back in enviroment..."`. Así se repiten todos los ciclos hasta que el primer proceso llega al último y podemos observar como el kernel cede el CPU a otros procesos recién cuando el proceso actual muere (ya que no hay llamadas explícitas a `schied_yield()` y no están habilitadas las interrupciones del timer).
+
+envid2env
+---------
+
+**Responder qué ocurre:**
+**en `JOS`, si un proceso llama a `sys_env_destroy(0)`**
+Cuando se hace el llamado `sys_env_destroy(0)`, lo primero que hace la syscall es pasar de `envid` a `struct Env *`, con lo que se hace llamado a `envid2env(0)`. Dicha función si se invoca con 0 devuelve el proceso actual, es decir `curenv`. Luego se llama a `env_destroy()`, con lo que está destruyendo el proceso actual (en dicha función se agrega la comprobación de: si se está destruyendo al proceso actual se hace llamado a `schied_yield` para correr otro programa `RUNNABLE`).
+
+**en Linux, si un proceso llama a `kill(0, 9)`**
+
+**E ídem para:**
+**JOS: `sys_env_destroy(-1)`**
+La definición de `envid_t` en `env.h` indica que ID's negativos significan errores. En particular tendremos un comportamiento inesperado ya que el en la sentencia: 
+`e = &envs[ENVX(envid)];`
+Estaremos accediendo a `envs[NENV]` ya que -1 es equivalente a todos los bits en 1.
+Con lo que seguramente falle en el siguiente `if`:
+```
+if (e->env_status == ENV_FREE || e->env_id != envid) {
+  *env_store = 0;
+  return -E_BAD_ENV;
+}
+```
+y devuelva `-E_BAD_ENV` y la syscall devuelve el error al usuario.
+
+**Linux: `kill(-1, 9)`**
