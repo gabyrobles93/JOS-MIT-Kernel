@@ -28,11 +28,29 @@ duppage(envid_t dstenv, void *addr)
 	int r;
 
 	// This is NOT what you should do in your fork.
+
+	// Aloca una pagina para el proceso hijo (dstenv)
+	// y la mapea en addr, con permisos de escritura
 	if ((r = sys_page_alloc(dstenv, addr, PTE_P|PTE_U|PTE_W)) < 0)
 		panic("sys_page_alloc: %e", r);
+
+	// Mapea la pagina del hijo previamente alocada (addr de dstenv)
+	// en el proceso padre (0 = currenv = proceso padre) en la direccion UTEMP
 	if ((r = sys_page_map(dstenv, addr, 0, UTEMP, PTE_P|PTE_U|PTE_W)) < 0)
 		panic("sys_page_map: %e", r);
+	
+	// Copia el contenido de la pagina addr (del padre)
+	// en UTEMP (del padre) que esta mapeada con addr (del hijo)
+	// Es decir esta copiando el contenido padre de addr en 
+	// la pagina del hijo (copia del A.S.)
 	memmove(UTEMP, addr, PGSIZE);
+
+	// Desmapea el mapeo previo (fue temporal) ya que
+	// solo tenia como objetivo poder copiar el contenido
+	// de la pagina padre a una mapeada con el hijo
+	// (es el modo de copiar el AS al padre al hijo)
+	// por ello el mapeo ya no es necesario
+	// 0 = currenv = padre
 	if ((r = sys_page_unmap(0, UTEMP)) < 0)
 		panic("sys_page_unmap: %e", r);
 }
@@ -66,7 +84,7 @@ dumbfork(void)
 	// Eagerly copy our entire address space into the child.
 	// This is NOT what you should do in your fork implementation.
 	for (addr = (uint8_t*) UTEXT; addr < end; addr += PGSIZE)
-		duppage(envid, addr);
+		duppage(envid, addr); // Llama a duppage con el envid del hijo
 
 	// Also copy the stack we are currently running on.
 	duppage(envid, ROUNDDOWN(&addr, PGSIZE));
