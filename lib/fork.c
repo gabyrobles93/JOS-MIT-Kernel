@@ -58,6 +58,60 @@ duppage(envid_t envid, unsigned pn)
 	return 0;
 }
 
+static void
+dup_or_share(envid_t dstenv, void *va, int perm) {
+
+}
+
+envid_t
+fork_v0(void)
+{
+	envid_t envid;
+	uintptr_t addr;
+	int r;
+
+	// Creamos un proceso nuevo
+	// El kernel copia los registros y 
+	// continua desde aqui tanto para padre 
+	// (envid > 0 (envid del hijo)) 
+	// como para el hijo (envid = 0).
+	envid = sys_exofork();
+	if (envid < 0)
+		panic("[fork_v0] sys_exofork failed: %e", envid);
+	if (envid == 0) {
+		// Si envid es 0 entonces el proceso
+		// es el hijo, corregimos la variable 
+		// thisenv y retornamos
+		thisenv = &envs[ENVX(sys_getenvid())];
+		return 0;
+	}
+
+	// Si envid > 0, somos el padre y envid tenemos el id del hijo
+	// Procesamos las paginas de memoria de 0 a UTOP
+	// Si la pagina esta mapeada invocamos a dup_or_share()
+	for (addr = 0; addr < UTOP; addr += PGSIZE) {
+		// Recuperamos el page directory entry
+		pde_t pde = uvpd[PDX(addr)];
+
+		// Checkeamos que el Page directory este mapeado
+		if (pde & PTE_P) {
+			pte_t pte = uvpt[PGNUM(addr)];
+
+			// Checkeamos que la page table este mapeada
+			if (pte & PTE_P) {
+				// Como la pagina esta mapeada, llamamos a dup_or_share
+				dup_or_share(envid, (void*)addr, pte & PTE_SYSCALL);
+			} 
+		}
+	}
+
+	// Seteamos el proceso hijo como runneable
+	if ((r = sys_env_set_status(envid, ENV_RUNNABLE)) < 0)
+		panic("[fork_v0] sys_env_set_status: %e", r);
+
+	return envid;
+}
+
 //
 // User-level fork with copy-on-write.
 // Set up our page fault handler appropriately.
@@ -78,7 +132,7 @@ envid_t
 fork(void)
 {
 	// LAB 4: Your code here.
-	panic("fork not implemented");
+	return fork_v0();
 }
 
 // Challenge!
