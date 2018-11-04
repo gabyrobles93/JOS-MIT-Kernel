@@ -60,7 +60,41 @@ duppage(envid_t envid, unsigned pn)
 
 static void
 dup_or_share(envid_t dstenv, void *va, int perm) {
+	int r;
 
+	// Si la pagina es de escritura
+	// debemos crear una copia, de igual
+	// manera que en duppage de dumbfork
+	if (perm & PTE_W) {
+		// Aloca una pagina para el proceso hijo (dstenv)
+		// y la mapea en addr, con permisos de escritura
+		if ((r = sys_page_alloc(dstenv, va, perm)) < 0)
+			panic("[dup_or_share] sys_page_alloc: %e", r);
+
+		// Mapea la pagina del hijo previamente alocada (addr de dstenv)
+		// en el proceso padre (0 = currenv = proceso padre) en la direccion UTEMP
+		if ((r = sys_page_map(dstenv, va, 0, UTEMP, perm)) < 0)
+			panic("[dup_or_share] sys_page_map: %e", r);
+		
+		// Copia el contenido de la pagina addr (del padre)
+		// en UTEMP (del padre) que esta mapeada con addr (del hijo)
+		// Es decir esta copiando el contenido padre de addr en 
+		// la pagina del hijo (copia del A.S.)
+		memmove(UTEMP, va, PGSIZE);
+
+		// Desmapea el mapeo previo (fue temporal) ya que
+		// solo tenia como objetivo poder copiar el contenido
+		// de la pagina padre a una mapeada con el hijo
+		// (es el modo de copiar el AS al padre al hijo)
+		// por ello el mapeo ya no es necesario
+		// 0 = currenv = padre
+		if ((r = sys_page_unmap(0, UTEMP)) < 0)
+			panic("[dup_or_share] sys_page_unmap: %e", r);
+	} else {
+		// Si la pagina es de solo lectura la compartimos
+		if ((r = sys_page_map(0, va, dstenv, va, perm)) < 0)
+			panic("[dup_or_share] sys_page_map: %e", r);
+	}
 }
 
 envid_t
