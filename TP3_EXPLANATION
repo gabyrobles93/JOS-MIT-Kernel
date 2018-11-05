@@ -73,7 +73,7 @@ En COW, que se hara en la parte 5, haremos tambien que se pueda compartir lo que
 
 
 Parte 3: Ejecucion en paralelo multi core
-Va a haber una cpu que arranca primero e inicializa el sistema y se encarga de arrancar las demás, con una función en kern/init.c que se llama lapic_init (para iniciar interrupciones) y mp_init (para encontrar cpus hay e inicializarlas, máximo 8). Esto no nos interesa xD. boot_aps, una vez detectado los procesadores adicionales, los pone a hacer trabajo, arranca una cpu con tal código, y le pasa el código. entry.S tiene el codigo que arranca la cpu, en kern/mpentry.S hace algo parecido, activa la memoria virtual, configura el stack, etc.. La cpu arranca en modo real, entonces, nosotros tenemos el codigo de la cpu cargado en memoria y están arriba en las direcciones altas, pero la cpu nueva no la puedo ejecutar ahi xq todavia no tiene paginado ni memoria virtual activada, pero ya no está abajo porque cuando haciamos el salto de entry page directory al posta del kernel, el kernel ya no tenia los mappings bajos. mp_main tiene la rutina para inicializar un cpu. En mp_main, hay que borrar el for infinito y usar ese espacio para llamar al scheduler.
+Va a haber una cpu que arranca primero e inicializa el sistema y se encarga de arrancar las demás, con una función en kern/init.c que se llama lapic_init (para iniciar interrupciones) y mp_init (para encontrar cpus hay e inicializarlas, máximo 8). Esto no nos interesa xD. bppt_aps, una vez detectado los procesadores adicionales, los pone a hacer trabajo, arranca una cpu con tal código, y le pasa el código. entry.S tiene el codigo que arranca la cpu, en kern/mpentry.S hace algo parecido, activa la memoria virtual, configura el stack, etc.. La cpu arranca en modo real, entonces, nosotros tenemos el codigo de la cpu cargado en memoria y están arriba en las direcciones altas, pero la cpu nueva no la puedo ejecutar ahi xq todavia no tiene paginado ni memoria virtual activada, pero ya no está abajo porque cuando haciamos el salto de entry page directory al posta del kernel, el kernel ya no tenia los mappings bajos. mp_main tiene la rutina para inicializar un cpu. En mp_main, hay que borrar el for infinito y usar ese espacio para llamar al scheduler.
 
 Tarea kernel_lock
 
@@ -88,4 +88,57 @@ Stacks de la cpu. Se hace un ciclo para que el procesador 0 mapee en el page dir
 trap_init_percpu -> cada cpu tiene que llamarlo. 
 
 
+fork_v0
+
+dumbfork y fork_v0
+Son muy paraecidos, ambos tienenuna llamada a sys_exofork, y luego tienen un ciclo para cada página, donde ahí hacen cosas ligeramente distintas.
+
+El dumbfork llama a una función duppage()
+El fork_v0 llama a otra función dup_or_share()
+
+Luego, ponen al hijo en RUNNING (estado).
+
+Se resume en tres pasos: Se crea un hijo clonando al padre, se rellena al hijo, y se pone al hijo en ejecución.
+
+--
+duppage() hace una copia de cada página del padre en el hijo.
+En duppage copia solo la parte del texto (text segment). Sólo copia una región que se sabe que esta mapeada entera, entonces no chequea el bit de presencia, etc...
+
+Para que el padre le pase información al hijo, se hace un proceso: se aloca una nueva página y se inserta en el hijo (pagina fisica), con page map se mapea la direccion fisica de esa pagina en el espacio del padre, entonces el padre y el hijo estan referenciando la misma pagina fisica, luego el padre escribe en esa pagina y lo podra ver el hijo. Luego el padre hace un unmap (se las desmapea). Todo esto es porque no se puede manejar dos address spaces al mismo tiempo. Para este proceso se usa la función sys_page_map().
+--
+
+dup_or_page: Esto si copia todo el espacio de direcciones, desde ZERO hasta UTOP, salteando las páginas que no esta presentes (chequea el bit PTE_P).
+
+Si la página es de lectura, lo que hace es que tanto padre como hijo compartan la misma página física, pero si es de escritura, hace el mismo proceso de duppage() (borra la referencia del padre a la memoria física en un tercer paso).
+
+Es una pequeña mejora que si hay paginas de solo lectura, no las copia al pedo, pero igualmente es ineficiente como duppage().
+
+--
+fork_cow
+Los PDE tienen un bit llamado bit de COW (copy on write). Cuando una página compartida entre dos procesos de solo lectura intenta ser escrita, se genera un PAGE FAULT, excepcion tomada por el kernel, que se fijará si esa PDE tiene en 1 el bit de COW, en ese caso, hará una copia de esa página de modo que el padre y el hijo tendrán ahora sus paginas individuales, una copia de la otra, luego el procesos padre o hijo que intento escribir en esa página.
+Los page fault generan información extra en el registro CR2, es la unica excepcion que se necesita tener informacion extra xD.
+
+
+PARTE 5: MANEJO DE PAGE FAULTS
+
+El kernel recibe las interrupciones pero se lava las manos y el USUARIO tiene que manejar los forks, etc. El kernel de jobs va a dar un mecanismmo para que cuando ocurre un page fault se invoque a un manejador del proceso de usuario.
+
+U -> K -> U (manejador)
+
+Se nos da una syscall que le permite a un proceso setear un manejador para el page fault.
+
+Tarea: set_pgfault_upcall
+
+Diferencias entre excepciones y fault: algunas excepciones se reintenta la misma instruccion, otras se vuelve a la instruccion siguiente.
+Page fault: se reintenta la misma instrucción.
+
+Existira un trapframe del lado de usuario llamado UTRAPFAME (Es un struct tambien pero con menos cosas)
+
+_alltraps 		-> trap(tf)	 	-> env_pop_tf
+			trap compone un UTF y nos llama al maneajador de assembler.
+handler_asm	  handler(utf) (lib/fork.c)     -> handler_asm (*)
+
+Hay que escribir un cacho de assembler en el trapframe.
+
+La parte que lo complica todo, el handler (*) se ejecuta en una pila distinta de la pila del proceso, hay otra pila y la razon es q la pila del usuario podría estar en una página marcada como COW, la llamamos la pila de excepciones.
 
