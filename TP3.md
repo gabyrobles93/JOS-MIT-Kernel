@@ -205,3 +205,23 @@ Previo a que un AP se inicialice con la función lapic_startap(), el BSP setea u
 El espacio para ese stack no puede reservarse en el archivo mpentry.S, ya que como arranca en modo real, no tiene ninguna referencia del page directory ya creado del kernel.
 
 
+**3. Cuando QEMU corre con múltiples CPUs, éstas se muestran en GDB como hilos de ejecución separados. Mostrar una sesión de GDB en la que se muestre cómo va cambiando el valor de la variable global mpentry_kstack **
+
+**PENDIENTE RESPUESTA EN EL GRUPO: https://groups.google.com/forum/#!topic/fisop-consultas/OBfSqUPC-bM**
+
+
+**4. En el archivo kern/mpentry.S se puede leer: **
+
+```
+# We cannot use kern_pgdir yet because we are still
+# running at a low EIP.
+movl $(RELOC(entry_pgdir)), %eax
+```
+**a) ¿Qué valor tiene el registro %eip cuando se ejecuta esa línea? Responder con redondeo a 12 bits, justificando desde qué región de memoria se está ejecutando este código.**
+**b) ¿Se detiene en algún momento la ejecución si se pone un breakpoint en mpentry_start? ¿Por qué?
+
+a) Esa línea pertenece al código entry point de un AP, dicho código fué mapeado a la dirección MPENTRY_PADDR con memmove en boot_aps(). Esa dirección es 0x7000 (es una dirección física). Por lo tanto, el registro %eip cuando pasa por esa instrucción, redondeada a 12 bits, es 0x7000.
+
+b) No, la ejecución no se detiene si se pone un breackpoint en mpentry_start. GDB desconoce la dirección de esa instrucción, esto se debe a que ese cpu está en real-mode y no tiene virtualización de memoria (que es lo que necesita gdb para ubicarlo).
+
+
