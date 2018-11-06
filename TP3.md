@@ -160,17 +160,21 @@ Un proceso puede cambiarse los permisos de una página re-mapeando la página en
 
 Un algoritmo alternativo podría obtenerse cambiando el orden de las operaciones. Si las operaciones originales son:
 
+```
 . Alocar una página para el proceso destino y mapearla en la dirección `addr`
 . Mapear la misma página en el proceso del padre, en la dirección UTEMP.
 . Copiar el contenido de la página `addr` (del padre) en la página de la dirección UTEMP
 . Desmapear el mapeo de UTEMP del padre.
+```
 
 El algoritmo alternativo presentaría el siguiente orden:
 
+```
 . Alocar una página para el proceso padre y mapearla en la dirección `UTEMP`
 . Copiar el contenido de la página `addr` (del padre) en la página de la dirección `UTEMP`
 . Mapear la misma página en el proceso hijo, en la dirección `addr`.
 . Desmapear el mapeo de UTEMP del padre.
+```
 
 **5. ¿Por qué se usa `ROUNDDOWN(&addr)` para copiar el stack? ¿Qué es `addr` y por qué, si el stack crece hacia abajo, se usa `ROUNDDOWN` y no `ROUNDUP`?**
 
