@@ -29,7 +29,7 @@ duppage(envid_t dstenv, void *addr)
 
 	// This is NOT what you should do in your fork.
 
-	// Aloca una pagina para el proceso hijo (dstenv)
+	// Aloca una pagina para el proceso destino (destenv)
 	// y la mapea en addr, con permisos de escritura
 	if ((r = sys_page_alloc(dstenv, addr, PTE_P|PTE_U|PTE_W)) < 0)
 		panic("sys_page_alloc: %e", r);
@@ -55,6 +55,10 @@ duppage(envid_t dstenv, void *addr)
 		panic("sys_page_unmap: %e", r);
 }
 
+/*
+Implementación de fork() altamente ineficiente, 
+pues copia físicamente (página a página) el espacio de memoria de padre a hijo. 
+*/
 envid_t
 dumbfork(void)
 {
@@ -68,6 +72,8 @@ dumbfork(void)
 	// so that the child will appear to have called sys_exofork() too -
 	// except that in the child, this "fake" call to sys_exofork()
 	// will return 0 instead of the envid of the child.
+
+	// Aloca un nuevo environment copiando el trapframe del padre
 	envid = sys_exofork();
 	if (envid < 0)
 		panic("sys_exofork: %e", envid);
@@ -83,6 +89,8 @@ dumbfork(void)
 	// We're the parent.
 	// Eagerly copy our entire address space into the child.
 	// This is NOT what you should do in your fork implementation.
+
+	// Copiamos en el address space del hijo, el Program Data & Heap del padre
 	for (addr = (uint8_t*) UTEXT; addr < end; addr += PGSIZE)
 		duppage(envid, addr); // Llama a duppage con el envid del hijo
 

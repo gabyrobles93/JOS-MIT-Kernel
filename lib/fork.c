@@ -97,6 +97,19 @@ dup_or_share(envid_t dstenv, void *va, int perm) {
 	}
 }
 
+/*
+Es muy parecido a dumbfork() ambos realizan las siguientes operaciones:
+ + Una llamada a sys_exofork (syscall para crear proceso hijo)
+ + En el padre devuelve el id del proceso creado, y 0 en el hijo
+ + Ante errores se invoca a panic()
+ + Poner al hijo como RUNNEABLE
+
+Pero hacen cosas ligeramente diferentes:
+ + dumbfork() llama a la función duppage, que copia de manera "boba" las paginas del padre al hijo
+ + fork_v0() llama a dup_or_share()
+
+*/
+
 envid_t
 fork_v0(void)
 {
@@ -131,7 +144,7 @@ fork_v0(void)
 		if (pde & PTE_P) {
 			pte_t pte = uvpt[PGNUM(addr)];
 
-			// Checkeamos que la page table este mapeada
+			// Checkeamos que la page table entry este mapeada
 			if (pte & PTE_P) {
 				// Como la pagina esta mapeada, llamamos a dup_or_share
 				dup_or_share(envid, (void*)addr, pte & PTE_SYSCALL);
