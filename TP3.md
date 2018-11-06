@@ -173,3 +173,6 @@ El algoritmo alternativo presentaría el siguiente orden:
 . Desmapear el mapeo de UTEMP del padre.
 
 **5. ¿Por qué se usa `ROUNDDOWN(&addr)` para copiar el stack? ¿Qué es `addr` y por qué, si el stack crece hacia abajo, se usa `ROUNDDOWN` y no `ROUNDUP`?**
+
+Se usa &addr por que es una variable local y por lo tanto vive en el stack, y ROUNDOWN por que queremos el principio de la página
+.
