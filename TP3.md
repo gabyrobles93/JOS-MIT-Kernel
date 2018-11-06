@@ -225,3 +225,90 @@ a) Esa línea pertenece al código entry point de un AP, dicho código fué mape
 b) No, la ejecución no se detiene si se pone un breackpoint en mpentry_start. GDB desconoce la dirección de esa instrucción, esto se debe a que ese cpu está en real-mode y no tiene virtualización de memoria (que es lo que necesita gdb para ubicarlo).
 
 
+**4. Con GDB, mostrar el valor exacto de %eip y mpentry_kstack cuando se ejecuta la instrucción anterior en el último AP. **
+
+Con los siguientes comandos se llega al breakpoint deseado *(0x7000)* en el thread 4 (último AP)
+
+```
+(gdb) b *0x7000 thread 4
+	Breakpoint 1 at 0x7000
+(gdb) continue
+	Continuing.
+	Thread 2 received signal SIGTRAP, Trace/breakpoint trap.
+	[Switching to Thread 2]
+	The target architecture is assumed to be i8086
+	[ 700:   0]    0x7000:	cli    
+	0x00000000 in ?? ()
+(gdb) disable 1
+(gdb) si 10
+	The target architecture is assumed to be i386
+	=> 0x7020:	mov    $0x10,%ax
+	0x00007020 in ?? ()
+(gdb) enable 1
+(gdb) continue
+	Continuing.
+	Thread 3 received signal SIGTRAP, Trace/breakpoint trap.
+	[Switching to Thread 3]
+	The target architecture is assumed to be i8086
+	[ 700:   0]    0x7000:	cli    
+	0x00000000 in ?? ()
+(gdb) disable 1
+(gdb) si 10
+	The target architecture is assumed to be i386
+	=> 0x7020:	mov    $0x10,%ax
+	0x00007020 in ?? ()
+(gdb) enable 1
+(gdb) continue
+Continuing.
+	Thread 4 received signal SIGTRAP, Trace/breakpoint trap.
+	[Switching to Thread 4]
+	The target architecture is assumed to be i8086
+	[ 700:   0]    0x7000:	cli    
+	0x00000000 in ?? ()
+```
+
+Con los siguientes comandos se visualizan las 10 próximas instrucciones:
+
+```
+(gdb) disable 1
+(gdb) si 10
+	The target architecture is assumed to be i386
+	=> 0x7020:	mov    $0x10,%ax
+	0x00007020 in ?? ()
+(gdb) x/10i $eip
+	=> 0x7020:	mov    $0x10,%ax
+	   0x7024:	mov    %eax,%ds
+	   0x7026:	mov    %eax,%es
+	   0x7028:	mov    %eax,%ss
+	   0x702a:	mov    $0x0,%ax
+	   0x702e:	mov    %eax,%fs
+	   0x7030:	mov    %eax,%gs
+	   0x7032:	mov    $0x11f000,%eax
+	   0x7037:	mov    %eax,%cr3
+	   0x703a:	mov    %cr4,%eax
+```
+
+Como vemos, `eax` se seteará con el valor $0x11f000 que corresponde con la dirección física del símbolo `entry_pgdir` que es la entrada al page directory del kernel. Podemos poner un breackpoint y visualizar el valor de `eip` en esta línea haciendo:
+
+```
+(gdb) watch $eax == 0x11f000
+	Watchpoint 3: $eax == 0x11f000
+(gdb) continue
+	Continuing.
+	=> 0x7037:	mov    %eax,%cr3
+	Thread 4 hit Watchpoint 3: $eax == 0x11f000
+	Old value = 0
+	New value = 1
+	0x00007037 in ?? ()
+(gdb) p $eip
+$1 = (void (*)()) 0x7037
+
+```
+Luego continuamos ejecutando líneas con `si` hasta la línea en que se se setea el stack en `mpentry_kstack` e imprimimos dicha dirección.
+
+```
+(gdb) si
+...
+(gdb) p mpentry_kstack
+$4 = (void *) 0xf025b000 <percpu_kstacks+131072>
+```
