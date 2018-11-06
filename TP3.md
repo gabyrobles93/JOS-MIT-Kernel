@@ -196,3 +196,12 @@ El CPU BSP, tras inicializar el sistema operativo, llama a la función boot_aps(
 Los APs inician en modo real (sin virtualizaciones, page directories, etc...) al igual que lo hizo anteriormente BSP. La diferencia es que ahora tenemos un procesador ya virtualizado, que puede 'ayudar' al resto en este proceso.
 
 La línea en cuestión, es ejecutada por BSP, y lo que hace es copiar código que servirá de entry-point para los APs. Dicho código,  ubicado en mpentry.S, presenta los tags mpentry_start y mpentry_end, que sirve para ubicarlo y determinar su tamaño. El mismo es copiado en la dirección física MPENTRY_PADDR, que no estará previamente en uso.
+
+
+**2. ¿Para qué se usa la variable global mpentry_kstack? ¿Qué ocurriría si el espacio para este stack se reservara en el archivo kern/mpentry.S, de manera similar a bootstack en el archivo kern/entry.S?**
+
+Previo a que un AP se inicialice con la función lapic_startap(), el BSP setea una variable global que es un puntero al kernel stack del cpu próximo a inicializar.
+
+El espacio para ese stack no puede reservarse en el archivo mpentry.S, ya que como arranca en modo real, no tiene ninguna referencia del page directory ya creado del kernel.
+
+
