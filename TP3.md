@@ -90,6 +90,8 @@ Cuando se hace el llamado `sys_env_destroy(0)`, lo primero que hace la syscall e
 
 **en Linux, si un proceso llama a `kill(0, 9)`**
 
+En Linux, mediante el comando `kill` se puede enviar una señal a un proceso o grupo de procesos. En particular, la señal número 9 significa KILL (terminar con el/los procesos). Si un proceso llama `kill(0, 9)` entonces terminará con todos los procesos cuyo ID de grupo sea el mismo que el suyo, incluido a si mismo.
+
 **E ídem para:**
 **JOS: `sys_env_destroy(-1)`**
 La definición de `envid_t` en `env.h` indica que ID's negativos significan errores. En particular tendremos un comportamiento inesperado ya que el en la sentencia: 
@@ -106,6 +108,7 @@ y devuelva `-E_BAD_ENV` y la syscall devuelve el error al usuario.
 
 **Linux: `kill(-1, 9)`**
 
+Según el manual de kill de linux, el comando `kill -9 -1` termina con todos los procesos que se pueda terminar.
 
 dumbfork
 --------
