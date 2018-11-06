@@ -180,3 +180,19 @@ El algoritmo alternativo presentaría el siguiente orden:
 
 Se usa &addr por que es una variable local y por lo tanto vive en el stack, y ROUNDOWN por que queremos el principio de la página
 .
+
+
+multicore_init
+--------
+
+**1. ¿Qué código copia, y a dónde, la siguiente línea de la función boot_aps()?**
+
+```
+memmove(code, mpentry_start, mpentry_end - mpentry_start);
+```
+En el sistema operativo, los CPUs se pueden clasificar en dos tipos: BSP (bootstrap procesors) responsables de bootear el sistema operativo, y APs (application procesors) activados por el BSP una vez que el S.O. esté up and running.
+
+El CPU BSP, tras inicializar el sistema operativo, llama a la función boot_aps(), que inicializa los CPUs del tipo APs.
+Los APs inician en modo real (sin virtualizaciones, page directories, etc...) al igual que lo hizo anteriormente BSP. La diferencia es que ahora tenemos un procesador ya virtualizado, que puede 'ayudar' al resto en este proceso.
+
+La línea en cuestión, es ejecutada por BSP, y lo que hace es copiar código que servirá de entry-point para los APs. Dicho código,  ubicado en mpentry.S, presenta los tags mpentry_start y mpentry_end, que sirve para ubicarlo y determinar su tamaño. El mismo es copiado en la dirección física MPENTRY_PADDR, que no estará previamente en uso.
