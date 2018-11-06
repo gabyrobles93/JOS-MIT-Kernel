@@ -114,9 +114,11 @@ dumbfork
 --------
 
 **1. Si, antes de llamar a `dumbfork()`, el proceso se reserva a sí mismo una página con `sys_page_alloc()` ¿se propagará una copia al proceso hijo? ¿Por qué?**
-Si se propagará la copia al proceso hijo ya que la función page alloc realiza el mapeo correspondiente y `dumbfork` realiza una copia página por página.
+
+Si un proceso se reserva una página a si mismo con `sys_page_alloc()`, dicha página va a mapearse en su address space en la dirección virutal `va` que le indique por parámetro. Para dicha dirección se valida que esté por debajo de UTOP. Si el mapeo se hace en el Pogram Data & Heap o en el Normal User Stack, entonces dicha página va a propagarse como copia al hijo. Esto se debe a que dumfork realiza copia al address space de hijo de las páginas asociadas al Program Data & Heap y Normal User Stack.
 
 **2. ¿Se preserva el estado de solo-lectura en las páginas copiadas? Mostrar, con código en espacio de usuario, cómo saber si una dirección de memoria es modificable por el proceso, o no. (Ayuda: usar las variables globales `uvpd` y/o `uvpt`.)**
+
 No, no se preserva el estado de solo lectura ya que todas las páginas necesarias que se van alocando se hace con los permisos `PTE_P|PTE_U|PTE_W`, independientemente de los permisos originales de la página que se está duplicando.
 En el siguiente fragmento de código podemos saber si una dirección de memoria es modificable por el proceso o no:
 ```
@@ -138,6 +140,7 @@ if (pde & PTE_P) {
 ```
 
 **3. Describir el funcionamiento de la función `duppage()`.**
+
 Se puede observar en el código original comentarios explicando la función paso por paso. Básicamente copia el contenido de una página de un proceso padre a un proceso hijo. Para ello realiza los siguientes pasos:
 1. Aloca una página para el proceso destino mapeada en la dirrección parámetro `addr`.
 2. Mapea la página recién alocada en la dirección `UTEMP` del proceso padre.
@@ -147,5 +150,26 @@ Se puede observar en el código original comentarios explicando la función paso
 **4. Supongamos que se añade a `duppage()` un argumento booleano que indica si la página debe quedar como solo-lectura en el proceso hijo:**
   * **indicar qué llamada adicional se debería hacer si el booleano es `true`**
   * **describir un algoritmo alternativo que no aumente el número de llamadas al sistema, que debe quedar en 3 (1 × alloc, 1 × map, 1 × unmap).**
+
+Un proceso puede cambiarse los permisos de una página re-mapeando la página en la nueva dirección con sys_page_map (pasando los nuevos permisos). Por lo tanto, si duppage recibe true como parámetro, se debería añadir al final la siguiente llamada adicional:
+
+```
+	if ((r = sys_page_map(dstenv, addr, dstenv, addr, PTE_P|PTE_U)) < 0)
+		panic("sys_page_map: %e", r);
+```
+
+Un algoritmo alternativo podría obtenerse cambiando el orden de las operaciones. Si las operaciones originales son:
+
+. Alocar una página para el proceso destino y mapearla en la dirección `addr`
+. Mapear la misma página en el proceso del padre, en la dirección UTEMP.
+. Copiar el contenido de la página `addr` (del padre) en la página de la dirección UTEMP
+. Desmapear el mapeo de UTEMP del padre.
+
+El algoritmo alternativo presentaría el siguiente orden:
+
+. Alocar una página para el proceso padre y mapearla en la dirección `UTEMP`
+. Copiar el contenido de la página `addr` (del padre) en la página de la dirección `UTEMP`
+. Mapear la misma página en el proceso hijo, en la dirección `addr`.
+. Desmapear el mapeo de UTEMP del padre.
 
 **5. ¿Por qué se usa `ROUNDDOWN(&addr)` para copiar el stack? ¿Qué es `addr` y por qué, si el stack crece hacia abajo, se usa `ROUNDDOWN` y no `ROUNDUP`?**
