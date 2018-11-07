@@ -611,6 +611,9 @@ env_run(struct Env *e)
 	// ejecutando Un proceso de usuario!
 	lcr3(PADDR(e->env_pgdir));
 
+	// Con env_pop_tf pasamos instantaneamente al modo usuario, antes hacemos unlock del kernel
+	unlock_kernel();
+
 	// Usamos env_pop_tf() para restaurar los registros del environment y
 	// volver al modo usuario (salir del modo kernel)
 	env_pop_tf(&(e->env_tf));
