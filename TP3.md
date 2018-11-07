@@ -207,7 +207,80 @@ El espacio para ese stack no puede reservarse en el archivo mpentry.S, ya que co
 
 **3. Cuando QEMU corre con múltiples CPUs, éstas se muestran en GDB como hilos de ejecución separados. Mostrar una sesión de GDB en la que se muestre cómo va cambiando el valor de la variable global mpentry_kstack **
 
-**PENDIENTE RESPUESTA EN EL GRUPO: https://groups.google.com/forum/#!topic/fisop-consultas/OBfSqUPC-bM**
+```
+(gdb) watch mpentry_kstack 
+	Hardware watchpoint 1: mpentry_kstack
+(gdb) continue
+	Continuing.
+	The target architecture is assumed to be i386
+	=> 0xf0100186 <boot_aps+127>:	mov    %esi,%ecx
+
+	Thread 1 hit Hardware watchpoint 1: mpentry_kstack
+
+	Old value = (void *) 0x0
+	New value = (void *) 0xf024b000 <percpu_kstacks+65536>
+	boot_aps () at kern/init.c:105
+	105			lapic_startap(c->cpu_id, PADDR(code));
+(gdb) bt
+	#0  boot_aps () at kern/init.c:105
+	#1  0xf010020f in i386_init () at kern/init.c:55
+	#2  0xf0100047 in relocated () at kern/entry.S:89
+(gdb) info threads
+	  Id   Target Id         Frame 
+	* 1    Thread 1 (CPU#0 [running]) boot_aps () at kern/init.c:105
+	  2    Thread 2 (CPU#1 [halted ]) 0x000fd412 in ?? ()
+	  3    Thread 3 (CPU#2 [halted ]) 0x000fd412 in ?? ()
+	  4    Thread 4 (CPU#3 [halted ]) 0x000fd412 in ?? ()
+(gdb) continue
+	Continuing.
+	=> 0xf0100186 <boot_aps+127>:	mov    %esi,%ecx
+
+	Thread 1 hit Hardware watchpoint 1: mpentry_kstack
+
+	Old value = (void *) 0xf024b000 <percpu_kstacks+65536>
+	New value = (void *) 0xf0253000 <percpu_kstacks+98304>
+	boot_aps () at kern/init.c:105
+	105			lapic_startap(c->cpu_id, PADDR(code));
+(gdb) info threads
+	  Id   Target Id         Frame 
+	* 1    Thread 1 (CPU#0 [running]) boot_aps () at kern/init.c:105
+	  2    Thread 2 (CPU#1 [running]) 0xf010029d in mp_main () at kern/init.c:123
+	  3    Thread 3 (CPU#2 [halted ]) 0x000fd412 in ?? ()
+	  4    Thread 4 (CPU#3 [halted ]) 0x000fd412 in ?? ()
+(gdb) thread 2
+	[Switching to thread 2 (Thread 2)]
+	#0  0xf010029d in mp_main () at kern/init.c:123
+	123		xchg(&thiscpu->cpu_status, CPU_STARTED); // tell boot_aps() we're up
+(gdb) bt
+	#0  0xf010029d in mp_main () at kern/init.c:123
+	#1  0x00007060 in ?? ()
+(gdb) p cpunum()
+	Could not fetch register "orig_eax"; remote failure reply 'E14'
+(gdb) thread 1
+	[Switching to thread 1 (Thread 1)]
+	#0  boot_aps () at kern/init.c:105
+	105			lapic_startap(c->cpu_id, PADDR(code));
+(gdb) p cpunum()
+	Could not fetch register "orig_eax"; remote failure reply 'E14'
+(gdb) continue
+	Continuing.
+	=> 0xf0100186 <boot_aps+127>:	mov    %esi,%ecx
+
+	Thread 1 hit Hardware watchpoint 1: mpentry_kstack
+
+	Old value = (void *) 0xf0253000 <percpu_kstacks+98304>
+	New value = (void *) 0xf025b000 <percpu_kstacks+131072>
+	boot_aps () at kern/init.c:105
+	105			lapic_startap(c->cpu_id, PADDR(code));
+
+```
+
+Las ejecuciones `p cpnum()` resultaron en el siguiente error:
+
+```
+Could not fetch register "orig_eax"; remote failure reply 'E14'
+```
+Lo cual fue validado con el docente. De todas formas, las impresiones deberían haber sido '1' y '0' en cada invocación. Siempre será N-1 donde N es el número de cpu thread.
 
 
 **4. En el archivo kern/mpentry.S se puede leer: **
