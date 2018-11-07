@@ -186,23 +186,57 @@ trap_init_percpu(void)
 	//
 	// LAB 4: Your code here:
 
+	// Obtenemos el cpunum (0 para cpu 1, 1 para cpu 2, etc...)
+	int cpuid = cpunum();
+	// Obtenenemos el struct cpuinfo del cpu en cuestión
+	struct CpuInfo * curcpu = &(cpus[cpuid]);
+	// De dicho cpu obtenemos la estructura Taskstate (que representa la TSS)
+	struct Taskstate * curts = &(curcpu->cpu_ts);
+
+	// Calculamos el indice del task segment del core en cuestión
+	uint16_t idx = (GD_TSS0 >> 3) + cpuid;
+	// Caklculamos el segmento del core en cuestión
+	uint16_t seg = idx << 3;
+
+	// El campo ts->ts_ss0 seguirá apuntando a GD_KD
+	curts->ts_ss0 = GD_KD;
+
+	// Al igual que en mem_init_mp() calculamos la dirección virtual del stack del cpu en cuestión
+	uintptr_t kstacktop_i = KSTACKTOP - cpuid * (KSTKSIZE + KSTKGAP);
+
+	// ts->ts_esp0 deberá inicializarse de manera dinámica según el valor de cpunum()
+	curts->ts_esp0 = kstacktop_i;
+
+	// Adecuación al nuevo esquema:
+
+	curts->ts_iomb = sizeof(struct Taskstate);
+
+	gdt[idx] = SEG16(STS_T32A, (uint32_t)(curts), sizeof(struct Taskstate) - 1, 0);
+
+	gdt[idx].sd_s = 0;
+
+
+	ltr(seg);
+
+	lidt(&idt_pd);
+
 	// Setup a TSS so that we get the right stack
 	// when we trap to the kernel.
-	ts.ts_esp0 = KSTACKTOP;
-	ts.ts_ss0 = GD_KD;
-	ts.ts_iomb = sizeof(struct Taskstate);
+	// ts.ts_esp0 = KSTACKTOP;
+	// ts.ts_ss0 = GD_KD;
+	// ts.ts_iomb = sizeof(struct Taskstate);
 
 	// Initialize the TSS slot of the gdt.
-	gdt[GD_TSS0 >> 3] =
-	        SEG16(STS_T32A, (uint32_t)(&ts), sizeof(struct Taskstate) - 1, 0);
-	gdt[GD_TSS0 >> 3].sd_s = 0;
+	// gdt[GD_TSS0 >> 3] =
+	//        SEG16(STS_T32A, (uint32_t)(&ts), sizeof(struct Taskstate) - 1, 0);
+	// gdt[GD_TSS0 >> 3].sd_s = 0;
 
 	// Load the TSS selector (like other segment selectors, the
 	// bottom three bits are special; we leave them 0)
-	ltr(GD_TSS0);
+	//ltr(GD_TSS0);
 
 	// Load the IDT
-	lidt(&idt_pd);
+	//lidt(&idt_pd);
 }
 
 void
