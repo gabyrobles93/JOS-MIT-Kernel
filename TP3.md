@@ -90,6 +90,8 @@ Cuando se hace el llamado `sys_env_destroy(0)`, lo primero que hace la syscall e
 
 **en Linux, si un proceso llama a `kill(0, 9)`**
 
+En Linux, mediante el comando `kill` se puede enviar una señal a un proceso o grupo de procesos. En particular, la señal número 9 significa KILL (terminar con el/los procesos). Si un proceso llama `kill(0, 9)` entonces terminará con todos los procesos cuyo ID de grupo sea el mismo que el suyo, incluido a si mismo.
+
 **E ídem para:**
 **JOS: `sys_env_destroy(-1)`**
 La definición de `envid_t` en `env.h` indica que ID's negativos significan errores. En particular tendremos un comportamiento inesperado ya que el en la sentencia: 
@@ -106,14 +108,17 @@ y devuelva `-E_BAD_ENV` y la syscall devuelve el error al usuario.
 
 **Linux: `kill(-1, 9)`**
 
+Según el manual de kill de linux, el comando `kill -9 -1` termina con todos los procesos que se pueda terminar.
 
 dumbfork
 --------
 
 **1. Si, antes de llamar a `dumbfork()`, el proceso se reserva a sí mismo una página con `sys_page_alloc()` ¿se propagará una copia al proceso hijo? ¿Por qué?**
-Si se propagará la copia al proceso hijo ya que la función page alloc realiza el mapeo correspondiente y `dumbfork` realiza una copia página por página.
+
+Si un proceso se reserva una página a si mismo con `sys_page_alloc()`, dicha página va a mapearse en su address space en la dirección virutal `va` que le indique por parámetro. Para dicha dirección se valida que esté por debajo de UTOP. Si el mapeo se hace en el Pogram Data & Heap o en el Normal User Stack, entonces dicha página va a propagarse como copia al hijo. Esto se debe a que dumfork realiza copia al address space de hijo de las páginas asociadas al Program Data & Heap y Normal User Stack.
 
 **2. ¿Se preserva el estado de solo-lectura en las páginas copiadas? Mostrar, con código en espacio de usuario, cómo saber si una dirección de memoria es modificable por el proceso, o no. (Ayuda: usar las variables globales `uvpd` y/o `uvpt`.)**
+
 No, no se preserva el estado de solo lectura ya que todas las páginas necesarias que se van alocando se hace con los permisos `PTE_P|PTE_U|PTE_W`, independientemente de los permisos originales de la página que se está duplicando.
 En el siguiente fragmento de código podemos saber si una dirección de memoria es modificable por el proceso o no:
 ```
@@ -135,6 +140,7 @@ if (pde & PTE_P) {
 ```
 
 **3. Describir el funcionamiento de la función `duppage()`.**
+
 Se puede observar en el código original comentarios explicando la función paso por paso. Básicamente copia el contenido de una página de un proceso padre a un proceso hijo. Para ello realiza los siguientes pasos:
 1. Aloca una página para el proceso destino mapeada en la dirrección parámetro `addr`.
 2. Mapea la página recién alocada en la dirección `UTEMP` del proceso padre.
@@ -145,4 +151,237 @@ Se puede observar en el código original comentarios explicando la función paso
   * **indicar qué llamada adicional se debería hacer si el booleano es `true`**
   * **describir un algoritmo alternativo que no aumente el número de llamadas al sistema, que debe quedar en 3 (1 × alloc, 1 × map, 1 × unmap).**
 
+Un proceso puede cambiarse los permisos de una página re-mapeando la página en la nueva dirección con sys_page_map (pasando los nuevos permisos). Por lo tanto, si duppage recibe true como parámetro, se debería añadir al final la siguiente llamada adicional:
+
+```
+	if ((r = sys_page_map(dstenv, addr, dstenv, addr, PTE_P|PTE_U)) < 0)
+		panic("sys_page_map: %e", r);
+```
+
+Un algoritmo alternativo podría obtenerse cambiando el orden de las operaciones. Si las operaciones originales son:
+
+```
+. Alocar una página para el proceso destino y mapearla en la dirección `addr`
+. Mapear la misma página en el proceso del padre, en la dirección UTEMP.
+. Copiar el contenido de la página `addr` (del padre) en la página de la dirección UTEMP
+. Desmapear el mapeo de UTEMP del padre.
+```
+
+El algoritmo alternativo presentaría el siguiente orden:
+
+```
+. Alocar una página para el proceso padre y mapearla en la dirección `UTEMP`
+. Copiar el contenido de la página `addr` (del padre) en la página de la dirección `UTEMP`
+. Mapear la misma página en el proceso hijo, en la dirección `addr`.
+. Desmapear el mapeo de UTEMP del padre.
+```
+
 **5. ¿Por qué se usa `ROUNDDOWN(&addr)` para copiar el stack? ¿Qué es `addr` y por qué, si el stack crece hacia abajo, se usa `ROUNDDOWN` y no `ROUNDUP`?**
+
+Se usa &addr por que es una variable local y por lo tanto vive en el stack, y ROUNDOWN por que queremos el principio de la página
+.
+
+
+multicore_init
+--------
+
+**1. ¿Qué código copia, y a dónde, la siguiente línea de la función boot_aps()?**
+
+```
+memmove(code, mpentry_start, mpentry_end - mpentry_start);
+```
+En el sistema operativo, los CPUs se pueden clasificar en dos tipos: BSP (bootstrap procesors) responsables de bootear el sistema operativo, y APs (application procesors) activados por el BSP una vez que el S.O. esté up and running.
+
+El CPU BSP, tras inicializar el sistema operativo, llama a la función boot_aps(), que inicializa los CPUs del tipo APs.
+Los APs inician en modo real (sin virtualizaciones, page directories, etc...) al igual que lo hizo anteriormente BSP. La diferencia es que ahora tenemos un procesador ya virtualizado, que puede 'ayudar' al resto en este proceso.
+
+La línea en cuestión, es ejecutada por BSP, y lo que hace es copiar código que servirá de entry-point para los APs. Dicho código,  ubicado en mpentry.S, presenta los tags mpentry_start y mpentry_end, que sirve para ubicarlo y determinar su tamaño. El mismo es copiado en la dirección física MPENTRY_PADDR, que no estará previamente en uso.
+
+
+**2. ¿Para qué se usa la variable global mpentry_kstack? ¿Qué ocurriría si el espacio para este stack se reservara en el archivo kern/mpentry.S, de manera similar a bootstack en el archivo kern/entry.S?**
+
+Previo a que un AP se inicialice con la función lapic_startap(), el BSP setea una variable global que es un puntero al kernel stack del cpu próximo a inicializar.
+
+El espacio para ese stack no puede reservarse en el archivo mpentry.S, ya que como arranca en modo real, no tiene ninguna referencia del page directory ya creado del kernel.
+
+
+**3. Cuando QEMU corre con múltiples CPUs, éstas se muestran en GDB como hilos de ejecución separados. Mostrar una sesión de GDB en la que se muestre cómo va cambiando el valor de la variable global mpentry_kstack **
+
+```
+(gdb) watch mpentry_kstack 
+	Hardware watchpoint 1: mpentry_kstack
+(gdb) continue
+	Continuing.
+	The target architecture is assumed to be i386
+	=> 0xf0100186 <boot_aps+127>:	mov    %esi,%ecx
+
+	Thread 1 hit Hardware watchpoint 1: mpentry_kstack
+
+	Old value = (void *) 0x0
+	New value = (void *) 0xf024b000 <percpu_kstacks+65536>
+	boot_aps () at kern/init.c:105
+	105			lapic_startap(c->cpu_id, PADDR(code));
+(gdb) bt
+	#0  boot_aps () at kern/init.c:105
+	#1  0xf010020f in i386_init () at kern/init.c:55
+	#2  0xf0100047 in relocated () at kern/entry.S:89
+(gdb) info threads
+	  Id   Target Id         Frame 
+	* 1    Thread 1 (CPU#0 [running]) boot_aps () at kern/init.c:105
+	  2    Thread 2 (CPU#1 [halted ]) 0x000fd412 in ?? ()
+	  3    Thread 3 (CPU#2 [halted ]) 0x000fd412 in ?? ()
+	  4    Thread 4 (CPU#3 [halted ]) 0x000fd412 in ?? ()
+(gdb) continue
+	Continuing.
+	=> 0xf0100186 <boot_aps+127>:	mov    %esi,%ecx
+
+	Thread 1 hit Hardware watchpoint 1: mpentry_kstack
+
+	Old value = (void *) 0xf024b000 <percpu_kstacks+65536>
+	New value = (void *) 0xf0253000 <percpu_kstacks+98304>
+	boot_aps () at kern/init.c:105
+	105			lapic_startap(c->cpu_id, PADDR(code));
+(gdb) info threads
+	  Id   Target Id         Frame 
+	* 1    Thread 1 (CPU#0 [running]) boot_aps () at kern/init.c:105
+	  2    Thread 2 (CPU#1 [running]) 0xf010029d in mp_main () at kern/init.c:123
+	  3    Thread 3 (CPU#2 [halted ]) 0x000fd412 in ?? ()
+	  4    Thread 4 (CPU#3 [halted ]) 0x000fd412 in ?? ()
+(gdb) thread 2
+	[Switching to thread 2 (Thread 2)]
+	#0  0xf010029d in mp_main () at kern/init.c:123
+	123		xchg(&thiscpu->cpu_status, CPU_STARTED); // tell boot_aps() we're up
+(gdb) bt
+	#0  0xf010029d in mp_main () at kern/init.c:123
+	#1  0x00007060 in ?? ()
+(gdb) p cpunum()
+	Could not fetch register "orig_eax"; remote failure reply 'E14'
+(gdb) thread 1
+	[Switching to thread 1 (Thread 1)]
+	#0  boot_aps () at kern/init.c:105
+	105			lapic_startap(c->cpu_id, PADDR(code));
+(gdb) p cpunum()
+	Could not fetch register "orig_eax"; remote failure reply 'E14'
+(gdb) continue
+	Continuing.
+	=> 0xf0100186 <boot_aps+127>:	mov    %esi,%ecx
+
+	Thread 1 hit Hardware watchpoint 1: mpentry_kstack
+
+	Old value = (void *) 0xf0253000 <percpu_kstacks+98304>
+	New value = (void *) 0xf025b000 <percpu_kstacks+131072>
+	boot_aps () at kern/init.c:105
+	105			lapic_startap(c->cpu_id, PADDR(code));
+
+```
+
+Las ejecuciones `p cpnum()` resultaron en el siguiente error:
+
+```
+Could not fetch register "orig_eax"; remote failure reply 'E14'
+```
+Lo cual fue validado con el docente. De todas formas, las impresiones deberían haber sido '1' y '0' en cada invocación. Siempre será N-1 donde N es el número de cpu thread.
+
+
+**4. En el archivo kern/mpentry.S se puede leer: **
+
+```
+# We cannot use kern_pgdir yet because we are still
+# running at a low EIP.
+movl $(RELOC(entry_pgdir)), %eax
+```
+**a) ¿Qué valor tiene el registro %eip cuando se ejecuta esa línea? Responder con redondeo a 12 bits, justificando desde qué región de memoria se está ejecutando este código.**
+**b) ¿Se detiene en algún momento la ejecución si se pone un breakpoint en mpentry_start? ¿Por qué?
+
+a) Esa línea pertenece al código entry point de un AP, dicho código fué mapeado a la dirección MPENTRY_PADDR con memmove en boot_aps(). Esa dirección es 0x7000 (es una dirección física). Por lo tanto, el registro %eip cuando pasa por esa instrucción, redondeada a 12 bits, es 0x7000.
+
+b) No, la ejecución no se detiene si se pone un breackpoint en mpentry_start. GDB desconoce la dirección de esa instrucción, esto se debe a que ese cpu está en real-mode y no tiene virtualización de memoria (que es lo que necesita gdb para ubicarlo).
+
+
+**4. Con GDB, mostrar el valor exacto de %eip y mpentry_kstack cuando se ejecuta la instrucción anterior en el último AP. **
+
+Con los siguientes comandos se llega al breakpoint deseado *(0x7000)* en el thread 4 (último AP)
+
+```
+(gdb) b *0x7000 thread 4
+	Breakpoint 1 at 0x7000
+(gdb) continue
+	Continuing.
+	Thread 2 received signal SIGTRAP, Trace/breakpoint trap.
+	[Switching to Thread 2]
+	The target architecture is assumed to be i8086
+	[ 700:   0]    0x7000:	cli    
+	0x00000000 in ?? ()
+(gdb) disable 1
+(gdb) si 10
+	The target architecture is assumed to be i386
+	=> 0x7020:	mov    $0x10,%ax
+	0x00007020 in ?? ()
+(gdb) enable 1
+(gdb) continue
+	Continuing.
+	Thread 3 received signal SIGTRAP, Trace/breakpoint trap.
+	[Switching to Thread 3]
+	The target architecture is assumed to be i8086
+	[ 700:   0]    0x7000:	cli    
+	0x00000000 in ?? ()
+(gdb) disable 1
+(gdb) si 10
+	The target architecture is assumed to be i386
+	=> 0x7020:	mov    $0x10,%ax
+	0x00007020 in ?? ()
+(gdb) enable 1
+(gdb) continue
+Continuing.
+	Thread 4 received signal SIGTRAP, Trace/breakpoint trap.
+	[Switching to Thread 4]
+	The target architecture is assumed to be i8086
+	[ 700:   0]    0x7000:	cli    
+	0x00000000 in ?? ()
+```
+
+Con los siguientes comandos se visualizan las 10 próximas instrucciones:
+
+```
+(gdb) disable 1
+(gdb) si 10
+	The target architecture is assumed to be i386
+	=> 0x7020:	mov    $0x10,%ax
+	0x00007020 in ?? ()
+(gdb) x/10i $eip
+	=> 0x7020:	mov    $0x10,%ax
+	   0x7024:	mov    %eax,%ds
+	   0x7026:	mov    %eax,%es
+	   0x7028:	mov    %eax,%ss
+	   0x702a:	mov    $0x0,%ax
+	   0x702e:	mov    %eax,%fs
+	   0x7030:	mov    %eax,%gs
+	   0x7032:	mov    $0x11f000,%eax
+	   0x7037:	mov    %eax,%cr3
+	   0x703a:	mov    %cr4,%eax
+```
+
+Como vemos, `eax` se seteará con el valor $0x11f000 que corresponde con la dirección física del símbolo `entry_pgdir` que es la entrada al page directory del kernel. Podemos poner un breackpoint y visualizar el valor de `eip` en esta línea haciendo:
+
+```
+(gdb) watch $eax == 0x11f000
+	Watchpoint 3: $eax == 0x11f000
+(gdb) continue
+	Continuing.
+	=> 0x7037:	mov    %eax,%cr3
+	Thread 4 hit Watchpoint 3: $eax == 0x11f000
+	Old value = 0
+	New value = 1
+	0x00007037 in ?? ()
+(gdb) p $eip
+$1 = (void (*)()) 0x7037
+
+```
+Luego continuamos ejecutando líneas con `si` hasta la línea en que se se setea el stack en `mpentry_kstack` e imprimimos dicha dirección.
+
+```
+(gdb) si
+...
+(gdb) p mpentry_kstack
+$4 = (void *) 0xf025b000 <percpu_kstacks+131072>
+```
