@@ -63,7 +63,25 @@ void
 ipc_send(envid_t to_env, uint32_t val, void *pg, int perm)
 {
 	// LAB 4: Your code here.
-	panic("ipc_send not implemented");
+
+	// Si pg es NULL, le pasaremos a sys_ipc_try_send un valor que entenderá que
+	// significa "no page"
+	if (!pg) {
+		pg = UTOP;
+	}
+
+	int ret;
+	while ((ret = sys_ipc_try_send(to_env, val, pg, perm)) == -E_IPC_NOT_RECV) {
+		// Usamos sys_yield() para ser CPU-Friendly
+		sys_yield();
+	}
+
+	if (ret < 0) {
+		// En cualquier error que no sea -E_IPC_NOT_RECV va a paniquear.
+		panic("sys_ipc_try_send error: %d \n", ret);
+	}
+
+	//panic("ipc_send not implemented");
 }
 
 // Find the first environment of the given type.  We'll use this to
