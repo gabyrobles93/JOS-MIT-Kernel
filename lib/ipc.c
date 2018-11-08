@@ -23,8 +23,32 @@ int32_t
 ipc_recv(envid_t *from_env_store, void *pg, int *perm_store)
 {
 	// LAB 4: Your code here.
-	panic("ipc_recv not implemented");
-	return 0;
+	
+	// No se espera recibir una página
+	// Cualquier dirección por mayor o igual a UTOP
+	// es interpretado por sys_ipc_recv como que
+	// no se espera una página.
+	if (!pg) pg = UTOP;
+
+	int ret = sys_ipc_recv(pg);
+	if (ret < 0) {
+		// Syscall con error
+		if (from_env_store) *from_env_store = 0;
+		if (perm_store) *perm_store = 0;
+		return ret;
+	}
+
+	// Syscall exitosa
+
+	// If 'from_env_store' is nonnull, then store the IPC sender's envid in *from_env_store.
+	if (from_env_store) *from_env_store = thisenv->env_ipc_from;
+	// If 'perm_store' is nonnull, then store the IPC sender's page permission in *perm_store
+	if (perm_store) *perm_store = thisenv->env_ipc_perm;	
+	// Return the value sent by the sender
+	return thisenv->env_ipc_value;
+
+	// panic("ipc_recv not implemented");
+	//return 0;
 }
 
 // Send 'val' (and 'pg' with 'perm', if 'pg' is nonnull) to 'toenv'.
