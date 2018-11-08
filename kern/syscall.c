@@ -383,7 +383,66 @@ static int
 sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 {
 	// LAB 4: Your code here.
-	panic("sys_ipc_try_send not implemented");
+
+	struct Env * to_env;
+	bool trans_page = false;
+	int ret = envid2env(envid, &to_env, false);
+	if (ret < 0) {
+		// return -E_BAD_ENV if environment envid doesn't currently exist
+		return -E_BAD_ENV;
+	}
+
+	// The send fails with a return value of -E_IPC_NOT_RECV if the
+	// target is not blocked, waiting for an IPC.
+	if (!to_env->env_ipc_recving) {
+		return -E_IPC_NOT_RECV;
+	}
+
+	if ((uintptr_t)srcva < UTOP) {
+		//-E_INVAL if srcva < UTOP but srcva is not page-aligned.
+		if (((uintptr_t)srcva % PGSIZE) != 0) {
+			return -E_INVAL;
+		}
+		//-E_INVAL if srcva < UTOP and perm is inappropriate
+		if (perm & ~(PTE_SYSCALL) || ((perm & (PTE_U | PTE_P)) != (PTE_U | PTE_P))) {
+			return -E_INVAL;
+		}
+		//	-E_INVAL if srcva < UTOP but srcva is not mapped in the caller's
+		pte_t * pte;
+		struct PageInfo * page;
+		if (!(page = page_lookup(curenv->env_pgdir, srcva, &pte))) {
+			return -E_INVAL;
+		}
+		// -E_INVAL if (perm & PTE_W), but srcva is read-only in the current environment's address space.
+		if ((perm & PTE_W) && !(*pte & PTE_W)) {
+			return -E_INVAL;
+		}
+
+		if (page_insert(to_env->env_pgdir, page, to_env->env_ipc_dstva, perm) < 0) {
+		//-E_NO_MEM if there's not enough memory to map srcva in envid's address space.
+		return -E_NO_MEM;
+		}
+
+		trans_page = true;
+	} 
+
+	// Otherwise, the send succeeds, and the target's ipc fields are
+	// updated as follows:
+
+	//    env_ipc_recving is set to 0 to block future sends;
+	to_env->env_ipc_recving = 0;
+	//    env_ipc_from is set to the sending envid;
+	to_env->env_ipc_from = curenv->env_id;
+	//    env_ipc_value is set to the 'value' parameter;
+	to_env->env_ipc_value = value;
+	//    env_ipc_perm is set to 'perm' if a page was transferred, 0 otherwise.
+	if (trans_page) to_env->env_ipc_perm = perm;
+	
+	// The target environment is marked runnable again
+	to_env->env_status = ENV_RUNNABLE;
+
+	return 0;
+	//panic("sys_ipc_try_send not implemented");
 }
 
 // Block until a value is ready.  Record that you want to receive
@@ -404,11 +463,12 @@ sys_ipc_recv(void *dstva)
 
 	// Si dstva es < UTOP => Esperamos recibir una página,
 	// En ese caso, validamos que la dirección esté alineada
-	if (dstva < UTOP) {
-		if (((uintptr_t)dstva % PGSIZE) != 0) return -E_INVAL;
-		// Indicamos donde queremos recibir la pagina de dato
-		curenv->env_ipc_dstva = dstva;
+	if ((uintptr_t)dstva < UTOP) {
+		if (PGOFF(dstva)) return -E_INVAL;
 	}
+
+	// Indicamos donde queremos recibir la pagina de dato
+	curenv->env_ipc_dstva = dstva;
 
 	// Seteamos el proceso como ENV_NOT_RUNNABLE
 	curenv->env_status = ENV_NOT_RUNNABLE;

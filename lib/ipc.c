@@ -28,7 +28,7 @@ ipc_recv(envid_t *from_env_store, void *pg, int *perm_store)
 	// Cualquier dirección por mayor o igual a UTOP
 	// es interpretado por sys_ipc_recv como que
 	// no se espera una página.
-	if (!pg) pg = UTOP;
+	if (!pg) pg = (void *) UTOP;
 
 	int ret = sys_ipc_recv(pg);
 	if (ret < 0) {
@@ -67,7 +67,7 @@ ipc_send(envid_t to_env, uint32_t val, void *pg, int perm)
 	// Si pg es NULL, le pasaremos a sys_ipc_try_send un valor que entenderá que
 	// significa "no page"
 	if (!pg) {
-		pg = UTOP;
+		pg = (void *)UTOP;
 	}
 
 	int ret;
