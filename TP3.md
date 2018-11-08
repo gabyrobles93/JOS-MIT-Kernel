@@ -183,7 +183,7 @@ Se usa &addr por que es una variable local y por lo tanto vive en el stack, y RO
 
 
 multicore_init
---------
+--------------
 
 **1. ¿Qué código copia, y a dónde, la siguiente línea de la función boot_aps()?**
 
@@ -384,4 +384,62 @@ Luego continuamos ejecutando líneas con `si` hasta la línea en que se se setea
 ...
 (gdb) p mpentry_kstack
 $4 = (void *) 0xf025b000 <percpu_kstacks+131072>
+```
+
+ipc_recv
+---------
+
+**1. Un proceso podría intentar enviar el valor númerico -E_INVAL vía ipc_send(). ¿Cómo es posible distinguir si es un error, o no? En estos casos: **
+
+```
+CASO A:
+envid_t src = -1;
+int r = ipc_recv(&src, 0, NULL);
+
+if (r < 0)
+  if (/* ??? */)
+    puts("Hubo error.");
+  else
+    puts("Valor negativo correcto.")
+```
+
+
+```
+CASO B
+// Versión B
+int r = ipc_recv(NULL, 0, NULL);
+
+if (r < 0)
+  if (/* ??? */)
+    puts("Hubo error.");
+  else
+    puts("Valor negativo correcto.")
+```
+
+En el caso A, el wrapper ipc_recv fue llamado con un valor de *from_env_store* distinto de NULL, por lo que de fallar la syscall dicho valor será puesto a cero. Entonces el código para diferenciar un error de un valor negativo enviado podría ser:
+
+```
+CASO A:
+envid_t src = -1;
+int r = ipc_recv(&src, 0, NULL);
+
+if (r < 0)
+  if (!src)
+    puts("Hubo error.");
+  else
+    puts("Valor negativo correcto.")
+```
+
+En el caso B, tanto *from_env_store* como *perm_store* pasados como parámetro son NULL, lo que significa que no servirán para distinguir un error de la syscall. En este caso puede utilizarse el registro `eax`, que si retorna con éxito, es puesto a 0. El código sería el siguiente:
+
+```
+CASO B
+// Versión B
+int r = ipc_recv(NULL, 0, NULL);
+
+if (r < 0)
+  if (!thisenv->env_tf.tf_regs.reg_eax)
+    puts("Hubo error.");
+  else
+    puts("Valor negativo correcto.")
 ```
