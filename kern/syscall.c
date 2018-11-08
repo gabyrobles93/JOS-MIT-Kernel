@@ -401,7 +401,29 @@ static int
 sys_ipc_recv(void *dstva)
 {
 	// LAB 4: Your code here.
-	panic("sys_ipc_recv not implemented");
+
+	// Si dstva es < UTOP => Esperamos recibir una página,
+	// En ese caso, validamos que la dirección esté alineada
+	if (dstva < UTOP) {
+		if (((uintptr_t)dstva % PGSIZE) != 0) return -E_INVAL;
+		// Indicamos donde queremos recibir la pagina de dato
+		curenv->env_ipc_dstva = dstva;
+	}
+
+	// Seteamos el proceso como ENV_NOT_RUNNABLE
+	curenv->env_status = ENV_NOT_RUNNABLE;
+
+	// Ponemos atrue el flag env_ipc_recving
+	curenv->env_ipc_recving = true;
+
+	// Como sys_yield() desaloja este proceso y no se llegará a la línea de return 0
+	// Escribimos 0 (éxito) en eax, registro de valor de retorno de esta syscall
+	curenv->env_tf.tf_regs.reg_eax = 0;
+
+	// Salimos de la CPU, no se volverá a entrar hasta que se reciba el mensaje
+	sys_yield();
+
+	//panic("sys_ipc_recv not implemented");
 	return 0;
 }
 
