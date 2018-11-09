@@ -383,7 +383,6 @@ static int
 sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 {
 	// LAB 4: Your code here.
-
 	struct Env * to_env;
 	bool trans_page = false;
 	int ret = envid2env(envid, &to_env, false);
@@ -526,6 +525,12 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	}
 	case SYS_page_unmap: {
 		return (int32_t) sys_page_unmap((envid_t)a1, (void *)a2);
+	}
+	case SYS_ipc_recv: {
+		return (int) sys_ipc_recv((void *)a1);
+	}
+	case SYS_ipc_try_send: {
+		return (int) sys_ipc_try_send((envid_t)a1, (uint32_t)a2, (void *)a3, (unsigned)a4);
 	}
 	default:
 		return -E_INVAL;

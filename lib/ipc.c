@@ -75,7 +75,7 @@ ipc_send(envid_t to_env, uint32_t val, void *pg, int perm)
 
 	if (ret < 0) {
 		// En cualquier error que no sea -E_IPC_NOT_RECV va a paniquear.
-		panic("sys_ipc_try_send error: %e \n", ret);
+		panic("sys_ipc_try_send error: %d \n", ret);
 	}
 }
 
