@@ -398,15 +398,15 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 		return -E_IPC_NOT_RECV;
 	}
 
-	if ((uintptr_t)srcva < UTOP) {
+	if ((uintptr_t)srcva < UTOP || (uintptr_t)to_env->env_ipc_dstva < UTOP) {
 		//-E_INVAL if srcva < UTOP but srcva is not page-aligned.
 		if (((uintptr_t)srcva % PGSIZE) != 0) {
 			return -E_INVAL;
 		}
 		//-E_INVAL if srcva < UTOP and perm is inappropriate
-		if (perm & ~(PTE_SYSCALL) || ((perm & (PTE_U | PTE_P)) != (PTE_U | PTE_P))) {
-			return -E_INVAL;
-		}
+		ret = check_permissions(perm);
+		if (ret) return -E_INVAL;
+
 		//	-E_INVAL if srcva < UTOP but srcva is not mapped in the caller's
 		pte_t * pte;
 		struct PageInfo * page;
@@ -419,8 +419,8 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 		}
 
 		if (page_insert(to_env->env_pgdir, page, to_env->env_ipc_dstva, perm) < 0) {
-		//-E_NO_MEM if there's not enough memory to map srcva in envid's address space.
-		return -E_NO_MEM;
+			//-E_NO_MEM if there's not enough memory to map srcva in envid's address space.
+			return -E_NO_MEM;
 		}
 
 		trans_page = true;
@@ -437,12 +437,12 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 	to_env->env_ipc_value = value;
 	//    env_ipc_perm is set to 'perm' if a page was transferred, 0 otherwise.
 	if (trans_page) to_env->env_ipc_perm = perm;
+	else to_env->env_ipc_perm = 0;
 	
 	// The target environment is marked runnable again
 	to_env->env_status = ENV_RUNNABLE;
 
 	return 0;
-	//panic("sys_ipc_try_send not implemented");
 }
 
 // Block until a value is ready.  Record that you want to receive
@@ -473,7 +473,7 @@ sys_ipc_recv(void *dstva)
 	// Seteamos el proceso como ENV_NOT_RUNNABLE
 	curenv->env_status = ENV_NOT_RUNNABLE;
 
-	// Ponemos atrue el flag env_ipc_recving
+	// Ponemos a true el flag env_ipc_recving
 	curenv->env_ipc_recving = true;
 
 	// Como sys_yield() desaloja este proceso y no se llegará a la línea de return 0

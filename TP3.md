@@ -151,7 +151,7 @@ Se puede observar en el código original comentarios explicando la función paso
   * **indicar qué llamada adicional se debería hacer si el booleano es `true`**
   * **describir un algoritmo alternativo que no aumente el número de llamadas al sistema, que debe quedar en 3 (1 × alloc, 1 × map, 1 × unmap).**
 
-Un proceso puede cambiarse los permisos de una página re-mapeando la página en la nueva dirección con sys_page_map (pasando los nuevos permisos). Por lo tanto, si duppage recibe true como parámetro, se debería añadir al final la siguiente llamada adicional:
+Un proceso puede cambiarse los permisos de una página re-mapeando la página en la nueva dirección con `sys_page_map` (pasando los nuevos permisos). Por lo tanto, si `duppage()` recibe `true` como parámetro, se debería añadir al final la siguiente llamada adicional:
 
 ```
 	if ((r = sys_page_map(dstenv, addr, dstenv, addr, PTE_P|PTE_U)) < 0)
@@ -161,9 +161,9 @@ Un proceso puede cambiarse los permisos de una página re-mapeando la página en
 Un algoritmo alternativo podría obtenerse cambiando el orden de las operaciones. Si las operaciones originales son:
 
 ```
-. Alocar una página para el proceso destino y mapearla en la dirección `addr`
+. Alocar una página para el proceso destino y mapearla en la dirección addr
 . Mapear la misma página en el proceso del padre, en la dirección UTEMP.
-. Copiar el contenido de la página `addr` (del padre) en la página de la dirección UTEMP
+. Copiar el contenido de la página addr (del padre) en la página de la dirección UTEMP
 . Desmapear el mapeo de UTEMP del padre.
 ```
 
@@ -171,16 +171,14 @@ El algoritmo alternativo presentaría el siguiente orden:
 
 ```
 . Alocar una página para el proceso padre y mapearla en la dirección `UTEMP`
-. Copiar el contenido de la página `addr` (del padre) en la página de la dirección `UTEMP`
-. Mapear la misma página en el proceso hijo, en la dirección `addr`.
+. Copiar el contenido de la página addr (del padre) en la página de la dirección UTEMP
+. Mapear la misma página en el proceso hijo, en la dirección addr.
 . Desmapear el mapeo de UTEMP del padre.
 ```
 
 **5. ¿Por qué se usa `ROUNDDOWN(&addr)` para copiar el stack? ¿Qué es `addr` y por qué, si el stack crece hacia abajo, se usa `ROUNDDOWN` y no `ROUNDUP`?**
 
 Se usa &addr por que es una variable local y por lo tanto vive en el stack, y ROUNDOWN por que queremos el principio de la página
-.
-
 
 multicore_init
 --------------
@@ -193,16 +191,16 @@ memmove(code, mpentry_start, mpentry_end - mpentry_start);
 En el sistema operativo, los CPUs se pueden clasificar en dos tipos: BSP (bootstrap procesors) responsables de bootear el sistema operativo, y APs (application procesors) activados por el BSP una vez que el S.O. esté up and running.
 
 El CPU BSP, tras inicializar el sistema operativo, llama a la función boot_aps(), que inicializa los CPUs del tipo APs.
-Los APs inician en modo real (sin virtualizaciones, page directories, etc...) al igual que lo hizo anteriormente BSP. La diferencia es que ahora tenemos un procesador ya virtualizado, que puede 'ayudar' al resto en este proceso.
+Los APs inician en modo real (sin virtualizaciones, page directories, etc.) al igual que lo hizo anteriormente BSP. La diferencia es que ahora tenemos un procesador ya virtualizado, que puede 'ayudar' al resto en este proceso.
 
-La línea en cuestión, es ejecutada por BSP, y lo que hace es copiar código que servirá de entry-point para los APs. Dicho código,  ubicado en mpentry.S, presenta los tags mpentry_start y mpentry_end, que sirve para ubicarlo y determinar su tamaño. El mismo es copiado en la dirección física MPENTRY_PADDR, que no estará previamente en uso.
+La línea en cuestión, es ejecutada por BSP, y lo que hace es copiar código que servirá de entry-point para los APs. Dicho código, ubicado en `mpentry.S`, presenta los tags `mpentry_start` y `mpentry_end`, que sirve para ubicarlo y determinar su tamaño. El mismo es copiado en la dirección física `MPENTRY_PADDR`, que no estará previamente en uso.
 
 
 **2. ¿Para qué se usa la variable global mpentry_kstack? ¿Qué ocurriría si el espacio para este stack se reservara en el archivo kern/mpentry.S, de manera similar a bootstack en el archivo kern/entry.S?**
 
-Previo a que un AP se inicialice con la función lapic_startap(), el BSP setea una variable global que es un puntero al kernel stack del cpu próximo a inicializar.
+Previo a que un AP se inicialice con la función `lapic_startap()`, el BSP setea una variable global que es un puntero al kernel stack del cpu próximo a inicializar.
 
-El espacio para ese stack no puede reservarse en el archivo mpentry.S, ya que como arranca en modo real, no tiene ninguna referencia del page directory ya creado del kernel.
+El espacio para ese stack no puede reservarse en el archivo `mpentry.S`, ya que como arranca en modo real, no tiene ninguna referencia del page directory ya creado del kernel.
 
 
 **3. Cuando QEMU corre con múltiples CPUs, éstas se muestran en GDB como hilos de ejecución separados. Mostrar una sesión de GDB en la que se muestre cómo va cambiando el valor de la variable global mpentry_kstack**
@@ -293,14 +291,14 @@ movl $(RELOC(entry_pgdir)), %eax
 **a) ¿Qué valor tiene el registro %eip cuando se ejecuta esa línea? Responder con redondeo a 12 bits, justificando desde qué región de memoria se está ejecutando este código.**
 **b) ¿Se detiene en algún momento la ejecución si se pone un breakpoint en mpentry_start? ¿Por qué?**
 
-a) Esa línea pertenece al código entry point de un AP, dicho código fué mapeado a la dirección MPENTRY_PADDR con memmove en boot_aps(). Esa dirección es 0x7000 (es una dirección física). Por lo tanto, el registro %eip cuando pasa por esa instrucción, redondeada a 12 bits, es 0x7000.
+a) Esa línea pertenece al código entry point de un AP, dicho código fué mapeado a la dirección `MPENTRY_PADDR` con `memmove()` en `boot_aps()`. Esa dirección es `0x7000` (es una dirección física). Por lo tanto, el registro `%eip` cuando pasa por esa instrucción, redondeada a 12 bits, es `0x7000`.
 
-b) No, la ejecución no se detiene si se pone un breackpoint en mpentry_start. GDB desconoce la dirección de esa instrucción, esto se debe a que ese cpu está en real-mode y no tiene virtualización de memoria (que es lo que necesita gdb para ubicarlo).
+b) No, la ejecución no se detiene si se pone un breakpoint en `mpentry_start`. GDB desconoce la dirección de esa instrucción, esto se debe a que ese cpu está en real-mode y no tiene virtualización de memoria (que es lo que necesita gdb para ubicarlo).
 
 
 **4. Con GDB, mostrar el valor exacto de %eip y mpentry_kstack cuando se ejecuta la instrucción anterior en el último AP.**
 
-Con los siguientes comandos se llega al breakpoint deseado *(0x7000)* en el thread 4 (último AP)
+Con los siguientes comandos se llega al breakpoint deseado `(0x7000)` en el thread 4 (último AP)
 
 ```
 (gdb) b *0x7000 thread 4
@@ -361,7 +359,7 @@ Con los siguientes comandos se visualizan las 10 próximas instrucciones:
 	   0x703a:	mov    %cr4,%eax
 ```
 
-Como vemos, `eax` se seteará con el valor $0x11f000 que corresponde con la dirección física del símbolo `entry_pgdir` que es la entrada al page directory del kernel. Podemos poner un breackpoint y visualizar el valor de `eip` en esta línea haciendo:
+Como vemos, `eax` se seteará con el valor `$0x11f000` que corresponde con la dirección física del símbolo `entry_pgdir` que es la entrada al page directory del kernel. Podemos poner un breakpoint y visualizar el valor de `eip` en esta línea haciendo:
 
 ```
 (gdb) watch $eax == 0x11f000
@@ -416,7 +414,7 @@ if (r < 0)
     puts("Valor negativo correcto.")
 ```
 
-En el caso A, el wrapper ipc_recv fue llamado con un valor de *from_env_store* distinto de NULL, por lo que de fallar la syscall dicho valor será puesto a cero. Entonces el código para diferenciar un error de un valor negativo enviado podría ser:
+En el caso A, el wrapper `ipc_recv` fue llamado con un valor de `from_env_store` distinto de NULL, por lo que de fallar la syscall dicho valor será puesto a cero. Entonces el código para diferenciar un error de un valor negativo enviado podría ser:
 
 ```
 CASO A:
@@ -430,7 +428,7 @@ if (r < 0)
     puts("Valor negativo correcto.")
 ```
 
-En el caso B, tanto *from_env_store* como *perm_store* pasados como parámetro son NULL, lo que significa que no servirán para distinguir un error de la syscall. En este caso puede utilizarse el registro `eax`, que si retorna con éxito, es puesto a 0. El código sería el siguiente:
+En el caso B, tanto `from_env_store` como `perm_store` pasados como parámetro son `NULL`, lo que significa que no servirán para distinguir un error de la syscall. En este caso puede utilizarse el registro `eax`, que si retorna con éxito, es puesto a 0. El código sería el siguiente:
 
 ```
 CASO B
