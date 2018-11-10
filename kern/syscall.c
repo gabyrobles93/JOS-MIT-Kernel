@@ -481,9 +481,7 @@ sys_ipc_recv(void *dstva)
 
 	// Salimos de la CPU, no se volverá a entrar hasta que se reciba el mensaje
 	sys_yield();
-
-	//panic("sys_ipc_recv not implemented");
-	return 0;
+	// No retorna
 }
 
 // Dispatches to the correct kernel function, passing the arguments.

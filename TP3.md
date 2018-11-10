@@ -441,3 +441,16 @@ if (r < 0)
   else
     puts("Valor negativo correcto.")
 ```
+
+sys_ipc_try_send
+----------------
+
+**Implementar la llamada al sistema `sys_ipc_try_send()` siguiendo los comentarios en el código, y responder:**
+
+**1. ¿Cómo se podría hacer bloqueante esta llamada? Esto es: qué estrategia de implementación se podría usar para que, si un proceso A intenta a enviar a B, pero B no está esperando un mensaje, el proceso A sea puesto en estado `ENV_NOT_RUNNABLE`, y sea despertado una vez B llame a `ipc_recv()`.**
+
+Se podria usar un mecanismo similar al que utiliza `sys_ipc_recv` agregando un flag del tipo `bool env_ipc_sending;` en el `struct Env`. De esta manera ambas syscalls primero validarán errores y luego en caso del send si el proceso pasado por parámetro no está dormido en receiving, el sender se va a dormir. Así el proceso que recibe (ahora la syscall recibirá el id del proceso que espera recibir), comprobará si este está intentando enviar datos con el flag propuesto. Como este es el caso, mapeará y tomará el dato necesario y despertará al sender y retornará. El caso análogo en el que el receive llega primero y este se pone en NOT RUNNEABLE ya lo conocemos y es el implementado hasta ahora.
+
+**2. Con esta nueva estrategia de implementación mejorada ¿podría ocurrir un deadlock? Poner un ejemplo de código de usuario que entre en deadlock.**
+
+**3. ¿Podría el kernel detectar el deadlock, e impedirlo devolviendo un nuevo error, E_DEADLOCK? ¿Qué función o funciones tendrían que modificarse para ello?**
