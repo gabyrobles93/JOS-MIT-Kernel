@@ -142,3 +142,17 @@ Hay que escribir un cacho de assembler en el trapframe.
 
 La parte que lo complica todo, el handler (*) se ejecuta en una pila distinta de la pila del proceso, hay otra pila y la razon es q la pila del usuario podría estar en una página marcada como COW, la llamamos la pila de excepciones.
 
+-----------------------------------------------------
+
+IPC:
+En la comunicación entre procesos se puede compartir un valor entero y una página (opcionalmente)
+
+Send no es bloqueante y recv si es bloqueante.
+
+el sys_Try_send es no bloqeuante: devuelve inmediatamente: pueden pasar dos cosas, envió bien o devuelve error.
+Se tiene que fijar que el proceso destino esté trabado esperando (si tiene el flag ev->ipc_recv, esta esperando recibir algo)
+
+ipc_send si va a ser bloqueante, va a hacer iterar sys_Try_send hasta que retorne que pudo enviar bien.
+
+¿COMO HACER BLOQUEANTE EL SEND? TENDRIAMOS Q TENER UN MECANISMO SIMILAR AL DE RECV, SE TIENE QUE PODER TENER UN FLAG
+el unico deadlock que puede llegar a ocurrir es en modo usuario por mal uso de los wrappers de las syscalls.
