@@ -29,9 +29,21 @@ set_pgfault_handler(void (*handler)(struct UTrapframe *utf))
 	if (_pgfault_handler == 0) {
 		// First time through!
 		// LAB 4: Your code here.
-		panic("set_pgfault_handler not implemented");
+		// Reservamos una pagina de memoria en UXSTACKTOP
+		r = sys_page_alloc(thisenv->env_id, (void*) (UXSTACKTOP-PGSIZE), PTE_P | PTE_W | PTE_U);
+		if (r<0) {
+			panic("Error in 'set_pgfault_handler': %e\n", r);
+		}
 	}
 
 	// Save handler pointer for assembly to call.
 	_pgfault_handler = handler;
+
+	// Llamamos a la syscall que setea el handler utilizando _pgfault_handler y no el 
+	// handler recibido como parámetro
+
+	r = sys_env_set_pgfault_upcall(thisenv->env_id, _pgfault_handler);
+	if (r < 0) {
+		panic("Error in 'set_pgfault_handler': %e\n", r);
+	}
 }
