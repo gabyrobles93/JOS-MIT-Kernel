@@ -469,6 +469,53 @@ page_fault_handler(struct Trapframe *tf)
 
 	// LAB 4: Your code here.
 
+	// Si el environment tenia configurado un handler de Page Fault...
+	if (curenv->env_pgfault_upcall) {
+		struct UTrapframe *u;
+
+		// Si es una llamada recursiva entonces el esp estará dentro del rango de [UXSTACKTOP; UXSTACKTOP-PGSIZE)
+		bool recursive = ((tf->tf_esp < UXSTACKTOP) && (tf->tf_esp >= UXSTACKTOP-PGSIZE)) ? true : false;
+	
+		if (recursive) {
+			// Si es llamada recursiva, debemos dejar una palabra en blanco (4 bytes) entre el UTrapFrame
+			// Anterior y el nuevo
+			u = (struct UTrapframe *) (tf->tf_esp - 4 - sizeof(struct UTrapframe));
+			// Chequeamos que tengamos permisos para escribir el UTrapFrame en el stack
+			// Y el word (4 bytes adicionales) en blanco para distinguir llamada recursiva
+			user_mem_assert(curenv, (void *) u, sizeof(struct UTrapframe) + 4, PTE_W | PTE_P);
+		} else {
+			// Si no es llamada recursiva, se debe escribir un UTrapFrame en UXSTACKTOP
+			u = (struct UTrapframe *) (UXSTACKTOP - sizeof(struct UTrapframe)); 
+			user_mem_assert(curenv, (void *) u, sizeof(struct UTrapframe), PTE_W | PTE_P);
+		}
+
+		// Chequeamos que el handler de usuario sea accesible para el usuario
+		user_mem_assert(curenv, (void *) curenv->env_pgfault_upcall, 4, PTE_P);
+		
+		// Completamos el UTrapFrame copiando desde tf
+		u->utf_fault_va = fault_va;
+		u->utf_err = tf->tf_err;
+		u->utf_regs = tf->tf_regs;
+		u->utf_eflags = tf->tf_eflags;
+		u->utf_eip = tf->tf_eip;
+		u->utf_esp = tf->tf_esp;
+
+		// Si es recursivo escribimos el ultimo byte en 0
+		if (recursive) {
+			uintptr_t * aux = (uintptr_t *) u;
+			aux += sizeof(struct UTrapframe);
+			*aux = 0;
+		}
+
+		// Cambiar a donde se va a ejecutar el proceso cuando volvamos a él:
+		tf->tf_eip = (uintptr_t) curenv->env_pgfault_upcall;
+		tf->tf_esp = (uintptr_t) u;
+
+		env_run(curenv);
+
+		return;
+	}
+
 	// Destroy the environment that caused the fault.
 	cprintf("[%08x] user fault va %08x ip %08x\n",
 	        curenv->env_id,
@@ -476,4 +523,6 @@ page_fault_handler(struct Trapframe *tf)
 	        tf->tf_eip);
 	print_trapframe(tf);
 	env_destroy(curenv);
+
+	return;
 }
