@@ -31,8 +31,8 @@ set_pgfault_handler(void (*handler)(struct UTrapframe *utf))
 		// LAB 4: Your code here.
 		// Reservamos una pagina de memoria en UXSTACKTOP
 		r = sys_page_alloc(0, (void*) (UXSTACKTOP-PGSIZE), PTE_P | PTE_W | PTE_U);
-		if (r<0) {
-			panic("Error in 'set_pgfault_handler': %e\n", r);
+		if (r < 0) {
+			panic("Error 'set_pgfault_handler': %e\n", r);
 		}
 	}
 
@@ -44,6 +44,6 @@ set_pgfault_handler(void (*handler)(struct UTrapframe *utf))
 
 	r = sys_env_set_pgfault_upcall(0, _pgfault_upcall);
 	if (r < 0) {
-		panic("Error in 'set_pgfault_handler': %e\n", r);
+		panic("Error 'set_pgfault_handler': %e\n", r);
 	}
 }
