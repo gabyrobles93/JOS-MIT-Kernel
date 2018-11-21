@@ -49,7 +49,8 @@ pgfault(struct UTrapframe *utf)
   r = sys_page_alloc(0, PFTEMP, PTE_W | PTE_U | PTE_P);
   if (r) panic("[pgfault] sys_page_alloc failed: %e", r);
 
-  // Copiamos el contenido de la página
+  // Alineamos y copiamos el contenido de la página
+  addr = (void *)ROUNDDOWN(addr, PGSIZE);
   memmove(PFTEMP, addr, PGSIZE);
 
   // Re-mapeamos correctamente
@@ -78,30 +79,21 @@ duppage(envid_t envid, unsigned pn)
   // Recuperamos la PTE asociada
   pte_t pte = uvpt[pn];
 
-  // Recuperamos los permisos originales de la página
-  int perm = (pte & 0xFFF);
-
   // Reconstruimos la dirección de memoria virtual
   void * va = (void *)(pn << PTXSHIFT);
 
   // Si la página era de escritura o tenía copy on write
-  if ((perm & PTE_W) || (perm & PTE_COW)) {
-    // Sacamos PTE_W
-    perm = perm | ~(PTE_W);
-
-    // Agregamos PTE_COW
-    perm = perm | PTE_COW;
-
-    // Mapeamos la página en el hijo
-    r = sys_page_map(0, va, envid, va, perm);
+  if ((pte & PTE_W) || (pte & PTE_COW)) {
+    // Mapeamos la página en el hijo sin PTE_W
+    r = sys_page_map(0, va, envid, va, PTE_COW | PTE_U | PTE_P);
     if (r) panic("[duppage] sys_page_map: %e", r);
 
-    // Re-mapeamos la página en el padre
-    r = sys_page_map(0, va, 0, va, perm);
+    // Re-mapeamos la página en el padre sin PTE_W
+    r = sys_page_map(0, va, 0, va, PTE_COW | PTE_U | PTE_P);
     if (r) panic("[duppage] sys_page_map: %e", r);
   } else {
     // Si es una pagina de solo lectura simplemente la compartimos
-    r = sys_page_map(0, va, envid, va, perm);
+    r = sys_page_map(0, va, envid, va, PTE_U | PTE_P);
     if (r) panic("[duppage] sys_page_map: %e", r);
   }
 
@@ -254,7 +246,7 @@ fork(void)
 
     // Procesamos las paginas de memoria de 0 a UTOP
     // Si la pagina esta mapeada invocamos a dup_or_share()
-    for (pdx = 0 ; pdx < PDX(UTOP) ; pdx) {
+    for (pdx = 0 ; pdx < PDX(UTOP) ; pdx++) {
       // Recuperamos el page directory entry
       pde_t pde = uvpd[pdx];
 
