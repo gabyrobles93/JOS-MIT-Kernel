@@ -454,3 +454,8 @@ Se podria usar un mecanismo similar al que utiliza `sys_ipc_recv` agregando un f
 **2. Con esta nueva estrategia de implementación mejorada ¿podría ocurrir un deadlock? Poner un ejemplo de código de usuario que entre en deadlock.**
 
 **3. ¿Podría el kernel detectar el deadlock, e impedirlo devolviendo un nuevo error, E_DEADLOCK? ¿Qué función o funciones tendrían que modificarse para ello?**
+
+fork
+----
+
+**Pregunta: ¿Puede hacerse con la función `set_pgfault_handler()`? De no poderse, ¿cómo llega al hijo el valor correcto de la variable global `_pgfault_handler`?**

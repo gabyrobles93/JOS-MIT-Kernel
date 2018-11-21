@@ -179,7 +179,76 @@ envid_t
 fork(void)
 {
 	// LAB 4: Your code here.
-	return fork_v0();
+  int error;
+
+  // Configuramos pgfault como el handler del padre
+  // Esto tambien reserva memoria para su pila de excepciones
+	set_pgfault_handler(pgfault);
+
+  // Creamos el proceso hijo y validamos correctamente
+  envid_t envid = sys_exofork();
+  if (envid < 0) panic("[fork] sys_exofork failed: %e", envid);
+
+  if (envid == 0) {
+		// Si envid es 0 entonces el proceso
+		// es el hijo, corregimos la variable 
+		// thisenv y retornamos
+		thisenv = &envs[ENVX(sys_getenvid())];
+		return 0;
+	} else {
+    // Es el proceso padre
+    // Usamos indices para poder iterar
+    // sobre la cantidad minima de paginas posibles
+    size_t pdx;
+    size_t ptx;
+
+    // Procesamos las paginas de memoria de 0 a UTOP
+    // Si la pagina esta mapeada invocamos a dup_or_share()
+    for (pdx = 0 ; pdx < PDX(UTOP) ; pdx) {
+      // Recuperamos el page directory entry
+      pde_t pde = uvpd[pdx];
+
+      // Verificamos que la Page Table este alocada
+      // caso contrario la ignoramos y continuamos con la siguiente
+      if ((pde & PTE_P) == 0) continue;
+
+      // Si está alocada recorremos las 1024 PTE,
+      // copiando las páginas alocadas.
+      for (ptx = 0 ; ptx < NPTENTRIES ; ptx++) {
+        // Construimos la direccion virtual
+        // Usamos 0 para el offset
+        uintptr_t addr = PGADDR(pdx, ptx, 0);
+
+        // Usamos el PGNUM para acceder a uvpt con la VA construida
+        pte_t pte = uvpt[PGNUM(addr)];
+
+        // Si la dirección es el Stack de excepciones
+        // no lo duplicamos sino que alocamos una nueva página
+        // para el proceso hijo
+        if (addr == (UXSTACKTOP - PGSIZE)) {
+          error = sys_page_alloc(envid, (void *)addr, PTE_W | PTE_U | PTE_P);
+          if (error) panic("[fork] sys_page_alloc failed: %e", error);
+          continue;
+        }
+
+        // Si la página no está alocada la salteamos
+        if ((pte & PTE_P) == 0) continue;
+
+        // Si la página está alocada llamamos a duppage()
+        duppage(envid, PGNUM(addr));
+      }
+    }
+
+    // Configuramos pgfault como el handler del hijo
+    error = sys_env_set_pgfault_upcall(envid, thisenv->env_pgfault_upcall);
+    if (error) panic("[fork] sys_env_set_pgfault_upcall failed: %e", error);
+
+    // Seteamos al proceso hijo como RUNNABLE
+    error = sys_env_set_status(envid, ENV_RUNNABLE);
+    if (error) panic("[fork] sys_env_set_status failed: %e", error);
+
+    return envid;
+  }
 }
 
 // Challenge!
