@@ -54,7 +54,37 @@ duppage(envid_t envid, unsigned pn)
 	int r;
 
 	// LAB 4: Your code here.
-	panic("duppage not implemented");
+
+  // Recuperamos la PTE asociada
+  pte_t pte = uvpt[pn];
+
+  // Recuperamos los permisos originales de la página
+  int perm = (pte & 0xFFF);
+
+  // Reconstruimos la dirección de memoria virtual
+  void * va = (void *)(pn << PTXSHIFT);
+
+  // Si la página era de escritura o tenía copy on write
+  if ((perm & PTE_W) || (perm & PTE_COW)) {
+    // Sacamos PTE_W
+    perm = perm | ~(PTE_W);
+
+    // Agregamos PTE_COW
+    perm = perm | PTE_COW;
+
+    // Mapeamos la página en el hijo
+    r = sys_page_map(0, va, envid, va, perm);
+    if (r) panic("[duppage] sys_page_map: %e", r);
+
+    // Re-mapeamos la página en el padre
+    r = sys_page_map(0, va, 0, va, perm);
+    if (r) panic("[duppage] sys_page_map: %e", r);
+  } else {
+    // Si es una pagina de solo lectura simplemente la compartimos
+    r = sys_page_map(0, va, envid, va, perm);
+    if (r) panic("[duppage] sys_page_map: %e", r);
+  }
+
 	return 0;
 }
 
