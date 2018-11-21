@@ -25,6 +25,17 @@ pgfault(struct UTrapframe *utf)
 	//   (see <inc/memlayout.h>).
 
 	// LAB 4: Your code here.
+  // Recuperamos la PTE en cuestión
+  pte_t pte = uvpt[PGNUM(addr)];
+  
+  // Verificamos que la página esté mapeada
+  if ((err & FEC_PR) == 0) panic("[pgfault] pgfault por página no mapeada");
+
+  // Verificamos que el page fault no haya sido por una lectura
+  if ((err & FEC_WR) == 0) panic("[pgfault] pgfault por lectura");
+
+  // Verificamos que la página tenga copy-on-write
+  if ((pte & PTE_COW) == 0) panic("[pgfault] pgfault COW no configurado");
 
 	// Allocate a new page, map it at a temporary location (PFTEMP),
 	// copy the data from the old page to the new page, then move the new
@@ -34,7 +45,16 @@ pgfault(struct UTrapframe *utf)
 
 	// LAB 4: Your code here.
 
-	panic("pgfault not implemented");
+  // Alocamos una nueva página en PFTEMP
+  r = sys_page_alloc(0, PFTEMP, PTE_W | PTE_U | PTE_P);
+  if (r) panic("[pgfault] sys_page_alloc failed: %e", r);
+
+  // Copiamos el contenido de la página
+  memmove(PFTEMP, addr, PGSIZE);
+
+  // Re-mapeamos correctamente
+  r = sys_page_map(0, PFTEMP, 0, addr, PTE_W | PTE_U | PTE_P);
+  if (r) panic("[pgfault] sys_page_map failed: %e", r);
 }
 
 //
@@ -247,7 +267,7 @@ fork(void)
       for (ptx = 0 ; ptx < NPTENTRIES ; ptx++) {
         // Construimos la direccion virtual
         // Usamos 0 para el offset
-        uintptr_t addr = PGADDR(pdx, ptx, 0);
+        uintptr_t addr = (uintptr_t)PGADDR(pdx, ptx, 0);
 
         // Usamos el PGNUM para acceder a uvpt con la VA construida
         pte_t pte = uvpt[PGNUM(addr)];
