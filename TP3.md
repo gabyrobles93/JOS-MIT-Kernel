@@ -458,7 +458,7 @@ Se podria usar un mecanismo similar al que utiliza `sys_ipc_recv` agregando un f
 Ejecución de Tests
 ----
 
-´´´
+```
 make[1]: Leaving directory '/home/grobles/FIUBA/Sistemas Operativos/TP1-SisOp'
 helloinit: OK (2.4s) 
 Part 0 score: 1/1
@@ -493,5 +493,5 @@ faultevilhandler: OK (1.8s)
 Part 5 score: 9/9
 
 Score: 20/20
-´´´
+```
 
