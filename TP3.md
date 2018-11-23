@@ -453,7 +453,11 @@ Se podria usar un mecanismo similar al que utiliza `sys_ipc_recv` agregando un f
 
 **2. Con esta nueva estrategia de implementación mejorada ¿podría ocurrir un deadlock? Poner un ejemplo de código de usuario que entre en deadlock.**
 
+Conversado en clase con docente, a la espera de e-mail.
+
 **3. ¿Podría el kernel detectar el deadlock, e impedirlo devolviendo un nuevo error, E_DEADLOCK? ¿Qué función o funciones tendrían que modificarse para ello?**
+
+Conversado en clase con docente, a la espera de e-mail.
 
 Ejecución de Tests
 ----
