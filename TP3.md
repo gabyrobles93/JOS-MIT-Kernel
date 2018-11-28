@@ -453,4 +453,49 @@ Se podria usar un mecanismo similar al que utiliza `sys_ipc_recv` agregando un f
 
 **2. Con esta nueva estrategia de implementación mejorada ¿podría ocurrir un deadlock? Poner un ejemplo de código de usuario que entre en deadlock.**
 
+Conversado en clase con docente, a la espera de e-mail.
+
 **3. ¿Podría el kernel detectar el deadlock, e impedirlo devolviendo un nuevo error, E_DEADLOCK? ¿Qué función o funciones tendrían que modificarse para ello?**
+
+Conversado en clase con docente, a la espera de e-mail.
+
+Ejecución de Tests
+----
+
+```
+make[1]: Leaving directory '/home/grobles/FIUBA/Sistemas Operativos/TP1-SisOp'
+helloinit: OK (2.4s) 
+Part 0 score: 1/1
+
+yield: OK (1.2s) 
+spin0: Timeout! OK (1.2s) 
+Part 1 score: 2/2
+
+dumbfork: OK (0.8s) 
+forktree: OK (2.0s) 
+spin: OK (2.0s) 
+Part 2 score: 3/3
+
+yield2: OK (1.0s) 
+stresssched: OK (2.1s) 
+Part 3 score: 2/2
+
+sendpage: OK (2.0s) 
+pingpong: OK (1.9s) 
+primes: OK (3.3s) 
+Part 4 score: 3/3
+
+faultread: OK (1.3s) 
+faultwrite: OK (2.3s) 
+faultdie: OK (1.9s) 
+faultregs: OK (2.2s) 
+faultalloc: OK (1.8s) 
+faultallocbad: OK (2.1s) 
+faultnostack: OK (1.8s) 
+faultbadhandler: OK (2.2s) 
+faultevilhandler: OK (1.8s) 
+Part 5 score: 9/9
+
+Score: 20/20
+```
+
