@@ -1,0 +1,57 @@
+ES EL LAB5 DEL MIT - EL TP PROMOCIONAL ES EL LAB6
+'''''''''''''''''''''''''''''''''''''''''''''''''
+Los ejercicios son idénticos a los del lab5 del MIT
+
+170 líneas de código. Fecha de entrega en 2 semanas (7 DE DICIEMBRE)
+
+File System
+'''''''''''
+
+Visto en la teórica: El disco se splitea en bloques de tamaño fijo. Se puede ver como un arreglo de bloques. El tamaño del bloque es desición del sistema operativo, no tiene nada que ver con lo que son los bloques físicos del disco duro (llamados sectores). Cada uno de los bloques del SO ppueden ser 1 o mas sectores físicos.
+
+En JOS: 8 Sectores de SO es 1 sector físico (Validar). En JOS los bloques son de 4096 bytes.
+
+En el bloque 1 está en SUPERBLOQUE. El bloque 0 está usado por el booter, y nunca es tocado por el sistema operativo. 
+
+El bloque 2 tiene el FREE MAPIT (Dice que bloques estan libres y cuales no).  Cada bit indica si un determinado bloque está utilizado o no. En 1 bloque tenemos 4096 * 8 bits que es 32768 bits entonces podemos referenciar esa cantidad de bloques. Si cada bloque tiene 4096 bytes, entonces podemos tener un disco de 4096 * 32768 bytes = 128 Mb (que es re poquito). Si se quiere mas disco se puede usar mas bloques de FREE MAPBIT.
+
+En JOS: Como es un exokernel no va a mantener el sistema de archivos. JOS dice: va a haber un proceso (envirnment) especial, del cual va a haber 1 solamente, a partir de init (el primer proceso de usuario). Y este va a ser el proceso que va  a hablar con el disco duro por el protocolo IDE (un protocolo bastante antiguo, no es asíncrono, es síncronico, se queda esperando a que el dato esté listo) el cual YA ESTA IMPLEMENTADO. El resto de procesos, cuando quieran leer o crear archivos, en lugar de hacer una syscall (read, write, open, etc..) van a hacer PETICIONES a ese ENVIRONMENT, a través de IPC (Internal Proccess Comunication) que ya implementamos en el TP3.
+
+¿Como accede ese environment especial de file system para acceder al disco? => Si es ring 3 es como proceso de usuario y no debería, si es ring 0 es un kernel aparte. Usa IOPL (dos bits de flags del registro EFLAGS), son 2 bits que un proceso no puede cambiarse, pero si el KERNEL lo pone en '3', entonces ese proceso puede utilizar I/O. El PRIMER EJERCICIO, si el tipo de enviroment es FS_ENV, se le da este permiso especial (los envirnment en JOS tienen tipo, recuerdas? xD). IOPL es el nombre de estos 2 bits.
+
+Inodos: JOS NO USA INODOS. 
+
+Directorios: Una secuencia de "struct File". Pesan 256 bytes. Habrpa uno de estos structs por cada archivo. Acá habrá metadata de los archivos, incluyendo qué bloques contiene los datos de ese archivo.
+
+¿Cómo encontrar un archivo en JOS?
+
+Se termina encontrando el struct File asociado.
+
+Dado un struct File => Se pide encontrar los datos asociados a ese File.
+Dado un struct File => Devolver el bloque X
+Para esto habrá que navegar el struct File, los bloques directos y los indirectos.
+
+file_block_walk => Le pido el bloque N de un archivo, y me retorna 
+
+El proceso especial de envirnment de file system (FS_ENV) mapeará su espacio de direcciones virtuales con bloques de disco. Cada vez que FS_ENV tenga que leer de disco, lo hará en páginas del address space que corresponda con sectores del disco. Bloque í-ésimo del disco irá con página i-ésimas del address space del FS_ENV. FS_ENV podrá compartirlo con IPC (hecho en TP3). El mapeo es 1 a 1 y es directo. Esto es la caché de bloques. No traigo todo del disco de una, porque llenaría la memoria, pero a medida que surgen fallas voy trayendo.
+
+JOS solo soporta discos de hasta 4 gigas.
+
+
+FS_ENV, cuando inicializó todo y todo funciona, entra en un ciclo infinito
+while(1) {
+	ipc_rcv()
+}
+
+con ipc se puede enviar un numero y una pagina. Casi siempre será una pagina. Justo despues de hacer un rcv hace un send() y envía el contenido solicitado.
+
+Los UNION de C: Es pseudoparecido a un struct. Un struct tiene n mienbros y tiene espacio para esos mienbros, un UNION puede tener muchos miembros pero de espacio solo tiene el que más grande sea (el tamaño). No entra todo lo que se define adentro, se hace para que un UNION pueda.
+
+
+SPAWN de PROCESOS
+
+Si yo quiero preparar un proceso a ejecución, con FORK se copiaba el estado. Aca ESP y EIP no estarán en estado correcto. Ahora lo tendrá que hacer el SPAWN. Aparece una nueva llamda a sistema que se llama sys_env_set_trapframe. Es sencillo, recibir el struct y copiar los datos PERO CON VALIDACIONES (Ejemplo, verificar que no esté el EOPL en el flags). 
+
+SHELL:
+
+El shell ya esta implemetnado, se pide que pueda tomar un programa por entrada estándar (12 líneas de código).
