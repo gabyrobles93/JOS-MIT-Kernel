@@ -96,10 +96,10 @@ flush_block(void *addr)
 
 	// LAB 5: Your code here.
 	// Redondeamos al tamaño de una página
-	addr = ROUNDDOWN(addr, PGSIZE);
+	addr = ROUNDDOWN(addr, BLKSIZE);
 
 	// Checkeamos que la pagina este mapeada
-	if (!va_is_mapped(addr)) panic("[flush_block] pagina no mapeada %p", addr);
+	if (!va_is_mapped(addr)) return;
 
 	// Checkeamos que la pagina tenga el bit de dirty
 	// caso contrario no es necesario volcar el contenido a disco
