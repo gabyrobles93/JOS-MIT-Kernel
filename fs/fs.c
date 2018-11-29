@@ -180,7 +180,7 @@ file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool all
 		memset(va, 0, BLKSIZE);
 
 		// Hacemos flush a disco
-		flush_block(va);	
+		flush_block(va);
 	}
 
 
