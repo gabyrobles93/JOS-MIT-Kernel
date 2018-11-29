@@ -146,7 +146,44 @@ static int
 file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool alloc)
 {
 	// LAB 5: Your code here.
-	panic("file_block_walk not implemented");
+	int error, indirect_block;
+	uintptr_t va;
+
+	// Checkeamos filebno que este dentro del rango permitido
+	if (filebno >= (NDIRECT + NINDIRECT)) return -E_INVAL;
+
+	// Comprobamos el caso facil en el que no es un bloque indirecto
+	if (filebno < NDIRECT) {
+		// Lo guardamos en ppdiskbno si es distinto de NULL
+		if (ppdiskbno) *ppdiskbno = &f->f_direct[filebno];
+		return 0;
+	}
+
+	// Comprobamos el caso de que no tengamos bloque de indireccion
+	if (f->f_indirect == NULL) {
+		// En este caso si el flag de alloc es false tenemos un error
+		if (alloc == false) return -E_NOT_FOUND;
+
+		// Caso contrario alocamos el bloque
+		// y comprobamos que no haya error
+		indirect_block = alloc_block();
+		if (indirect_block < 0) return -E_NO_DISK;
+
+		f->f_indirect = indirect_block;
+
+		// Alocamos una pagina virtual para el bloque alocado
+		error = sys_page_alloc(0, diskaddr(indirect_block), PTE_U | PTE_W | PTE_P);
+		if (error) panic("[file_block_walk] sys_page_alloc failed %e", error);
+
+		// Limpiamos el bloque alocado
+		va = diskaddr(indirect_block);
+		memset(va, 0, BLKSIZE);
+
+		// Hacemos flush a disco
+		flush_block(va);	
+	}
+
+
 }
 
 // Set *blk to the address in memory where the filebno'th
