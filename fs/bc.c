@@ -51,6 +51,20 @@ bc_pgfault(struct UTrapframe *utf)
 	//
 	// LAB 5: you code here:
 
+	// Redondeamos al tamaño de una página
+	addr = ROUNDDOWN(addr, PGSIZE);
+
+	// Alocamos la pagina en la región de mapeo al disco
+	r = sys_page_alloc(0, addr, PTE_W | PTE_U | PTE_P);
+	if (r < 0) panic("[bc_pgfault] sys_page_alloc failed %e", r);
+
+	// Leemos desde el número de sector correspondiente
+	// y vamos mapeando desde addr (la funcion incrementa
+	// addr de SECTSIZE) indicandole la cantidad de sectores
+	// que le corresponden a un bloque (BLKSECTS)
+	r = ide_read(blockno * BLKSECTS, addr, BLKSECTS);
+	if (r < 0) panic("[bc_pgfault] ide_read failed %e", r);
+
 	// Clear the dirty bit for the disk block page since we just read the
 	// block from disk
 	if ((r = sys_page_map(0, addr, 0, addr, uvpt[PGNUM(addr)] & PTE_SYSCALL)) <
