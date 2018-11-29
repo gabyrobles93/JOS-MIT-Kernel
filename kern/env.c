@@ -467,7 +467,7 @@ env_create(uint8_t *binary, enum EnvType type)
 	// Checkeamos con el type del enviroment si es el user File Server
 	// en ese caso le damos los privilegios de entrada-salida
 	if (new_env->env_type == ENV_TYPE_FS)
-		new_env->env_tf.tf_eflags |= FL_IOPL_MASK;
+		new_env->env_tf.tf_eflags |= FL_IOPL_3;
 }
 
 //
