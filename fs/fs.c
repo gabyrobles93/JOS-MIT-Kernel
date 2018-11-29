@@ -62,7 +62,20 @@ alloc_block(void)
 	// super->s_nblocks blocks in the disk altogether.
 
 	// LAB 5: Your code here.
-	panic("alloc_block not implemented");
+	// Recorremos todos los bloques y retornamos el primero libre
+	for (int blockno = 0 ; blockno < super->s_nblocks ; blockno++) {
+		if (block_is_free((uint32_t)blockno)) {
+			// Ponemos en cero en el bitmap para
+			// marcar el bloque como ocupado
+			bitmap[blockno / 32] &= ~(1 << (blockno % 32));
+
+			// Hacemos flush del bloque alocado
+			flush_block(diskaddr(blockno));
+			
+			// retornamos el numero de bloque alocado
+			return blockno;
+		}
+	}
 	return -E_NO_DISK;
 }
 
