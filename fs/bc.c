@@ -89,12 +89,30 @@ void
 flush_block(void *addr)
 {
 	uint32_t blockno = ((uint32_t) addr - DISKMAP) / BLKSIZE;
+	int error;
 
 	if (addr < (void *) DISKMAP || addr >= (void *) (DISKMAP + DISKSIZE))
 		panic("flush_block of bad va %08x", addr);
 
 	// LAB 5: Your code here.
-	panic("flush_block not implemented");
+	// Redondeamos al tamaño de una página
+	addr = ROUNDDOWN(addr, PGSIZE);
+
+	// Checkeamos que la pagina este mapeada
+	if (!va_is_mapped(addr)) panic("[flush_block] pagina no mapeada %p", addr);
+
+	// Checkeamos que la pagina tenga el bit de dirty
+	// caso contrario no es necesario volcar el contenido a disco
+	if (!va_is_dirty(addr)) return;
+
+	// Si llegamos aca, realizamos la escritura en disco
+	// los argumentos son los mismos que para la lectura
+	error = ide_write(blockno * BLKSECTS, addr, BLKSECTS);
+	if (error) panic("[flush_block] ide_write failed %e", error);
+
+	// Limpiamos el bit de dirty de igual manera que en bc_pgfault
+	error = sys_page_map(0, addr, 0, addr, uvpt[PGNUM(addr)] & PTE_SYSCALL);
+	if (error) panic("[flush_block] sys_page_map: %e", error);
 }
 
 // Test that the block cache works, by smashing the superblock and
