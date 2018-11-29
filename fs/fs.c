@@ -199,7 +199,12 @@ int
 file_get_block(struct File *f, uint32_t filebno, char **blk)
 {
 	// LAB 5: Your code here.
-	panic("file_get_block not implemented");
+	int error;
+	// La función file_block_walk hace las validaciones correspondientes
+	error = file_block_walk(f, filebno, (uint32_t**)blk, true);
+
+	if (error) return error;
+	else return 0;
 }
 
 // Try to find a file named "name" in dir.  If so, set *file to it.
