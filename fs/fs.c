@@ -69,8 +69,8 @@ alloc_block(void)
 			// marcar el bloque como ocupado
 			bitmap[blockno / 32] &= ~(1 << (blockno % 32));
 	
-			// Hacemos flush del bloque alocado
-			flush_block(diskaddr(blockno));
+			// Hacemos flush del bitmap
+			flush_block(bitmap);
 			
 			// retornamos el numero de bloque alocado
 			return blockno;
