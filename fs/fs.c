@@ -63,12 +63,12 @@ alloc_block(void)
 
 	// LAB 5: Your code here.
 	// Recorremos todos los bloques y retornamos el primero libre
-	for (int blockno = 0 ; blockno < super->s_nblocks ; blockno++) {
+	for (int blockno = 0 ; blockno < super->s_nblocks; blockno++) {
 		if (block_is_free((uint32_t)blockno)) {
 			// Ponemos en cero en el bitmap para
 			// marcar el bloque como ocupado
 			bitmap[blockno / 32] &= ~(1 << (blockno % 32));
-
+	
 			// Hacemos flush del bloque alocado
 			flush_block(diskaddr(blockno));
 			
@@ -198,13 +198,26 @@ file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool all
 int
 file_get_block(struct File *f, uint32_t filebno, char **blk)
 {
-	// LAB 5: Your code here.
-	int error;
-	// La función file_block_walk hace las validaciones correspondientes
-	error = file_block_walk(f, filebno, (uint32_t**)blk, true);
 
-	if (error) return error;
-	else return 0;
+	int errcode;
+	uint32_t * global_block_ref;
+
+	errcode = file_block_walk(f, filebno, &global_block_ref, true);
+
+	if (errcode) return errcode;
+
+	// Puede ocurrir que el bloque que recuperamos no exista
+	// En ese caso lo alocamos
+
+	if (*global_block_ref == 0) *global_block_ref = alloc_block();
+
+	//	-E_NO_DISK if a block needed to be allocated but the disk is full.
+
+	if (*global_block_ref == 0) return -E_NO_DISK;
+
+	*blk = (char *) diskaddr(*global_block_ref);
+	
+	return 0;
 }
 
 // Try to find a file named "name" in dir.  If so, set *file to it.
