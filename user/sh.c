@@ -55,7 +55,19 @@ again:
 			// then close the original 'fd'.
 
 			// LAB 5: Your code here.
-			panic("< redirection not implemented");
+			// Abrimos el archivo 't' como solo lectura
+			if ((fd = open(t, O_RDONLY)) < 0) {
+				cprintf("open %s for read: %e", t, fd);
+				exit();
+			}
+			// Si no es stdin llamamos a dup
+			if (fd != 0) {
+				r = dup(fd, 0);
+				if (r) cprintf("dup for %s failed: %e", t, r);
+
+				// Cerramos el file descriptor viejo
+				close(fd);
+			}
 			break;
 
 		case '>':  // Output redirection
