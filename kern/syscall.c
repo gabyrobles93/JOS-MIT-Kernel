@@ -423,7 +423,8 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 		return -E_IPC_NOT_RECV;
 	}
 
-	if ((uintptr_t)srcva < UTOP || (uintptr_t)to_env->env_ipc_dstva < UTOP) {
+	// Mapeamos si AMBOS procesos lo solicitaro
+	if ((uintptr_t)srcva < UTOP && (uintptr_t)to_env->env_ipc_dstva < UTOP) {
 		//-E_INVAL if srcva < UTOP but srcva is not page-aligned.
 		if (((uintptr_t)srcva % PGSIZE) != 0) {
 			return -E_INVAL;
