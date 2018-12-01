@@ -53,6 +53,8 @@ extern void trap_19();
 extern void trap_20();
 
 extern void trap_32();
+extern void trap_33();
+extern void trap_36();
 
 extern void trap_48();
 
@@ -151,6 +153,10 @@ trap_init(void)
 
 	// Timer interruption
 	SETGATE(idt[IRQ_OFFSET + IRQ_TIMER], 0, GD_KT, trap_32, 0);
+	// Keyboard interruption
+	SETGATE(idt[IRQ_OFFSET + IRQ_KBD], 0, GD_KT, trap_33, 0);
+	// Serial port interruption
+	SETGATE(idt[IRQ_OFFSET + IRQ_SERIAL], 0, GD_KT, trap_36, 0);
 
 	// SYSCALL interrupt
 	SETGATE(idt[48], 0, GD_KT, trap_48, 3);
@@ -318,6 +324,14 @@ trap_dispatch(struct Trapframe *tf)
 	case IRQ_OFFSET + IRQ_TIMER: {
 		lapic_eoi(); 		// Avisamos al hardware que atrapamos la interrupcion
 		sched_yield(); 	// Actuamos en consecuencia de la interrupcion (round-robin)
+		return;
+	}
+	case IRQ_OFFSET + IRQ_KBD: {
+		kbd_intr();
+		return;
+	}
+	case IRQ_OFFSET + IRQ_SERIAL: {
+		serial_intr();
 		return;
 	}
 	case T_SYSCALL: {
