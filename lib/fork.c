@@ -91,7 +91,13 @@ duppage(envid_t envid, unsigned pn)
     // Re-mapeamos la página en el padre sin PTE_W
     r = sys_page_map(0, va, 0, va, PTE_COW | PTE_U | PTE_P);
     if (r) panic("[duppage] sys_page_map: %e", r);
-  } else {
+  } else if (pte & PTE_SHARE) {
+		// Si es una pagina que debe ser compartida con
+		// los mismos permisos que en el padre (por cuestiones
+		// del filesystem, asi persisten cambios de archivos abiertos)
+    r = sys_page_map(0, va, envid, va, pte & PTE_SYSCALL);
+    if (r) panic("[duppage] sys_page_map: %e", r);
+	} else {
     // Si es una pagina de solo lectura simplemente la compartimos
     r = sys_page_map(0, va, envid, va, PTE_U | PTE_P);
     if (r) panic("[duppage] sys_page_map: %e", r);
