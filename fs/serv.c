@@ -222,7 +222,30 @@ serve_read(envid_t envid, union Fsipc *ipc)
 		        req->req_n);
 
 	// Lab 5: Your code here:
-	return 0;
+	// Variable para validacion de errores
+	int r;
+	// Definimos el struct open file
+	struct OpenFile * open_file;
+
+	// Transformamos de file ID a OpenFile
+	r = openfile_lookup(envid, req->req_fileid, &open_file);
+	if (r < 0) return r;
+
+	r = file_read(
+		open_file->o_file, 
+		ret->ret_buf, 
+		MIN(req->req_n, PGSIZE),
+		open_file->o_fd->fd_offset
+	);
+
+	// Si hubo error retornamos
+	if (r < 0) return r;
+
+	// Actualizamos el offset dentro del archivo
+	open_file->o_fd->fd_offset += r;
+
+
+	return r;
 }
 
 

@@ -213,7 +213,7 @@ file_get_block(struct File *f, uint32_t filebno, char **blk)
 
 	//	-E_NO_DISK if a block needed to be allocated but the disk is full.
 
-	if (*global_block_ref == 0) return -E_NO_DISK;
+	if (*global_block_ref < 0) return -E_NO_DISK;
 
 	*blk = (char *) diskaddr(*global_block_ref);
 	
