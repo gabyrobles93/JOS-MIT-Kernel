@@ -263,7 +263,30 @@ serve_write(envid_t envid, struct Fsreq_write *req)
 		        req->req_n);
 
 	// LAB 5: Your code here.
-	panic("serve_write not implemented");
+	// Definimos el struct open file y variable de error
+	int r;
+	struct OpenFile * open_file;
+
+	// Transformamos file ID a OpenFile
+	r = openfile_lookup(envid, req->req_fileid, &open_file);
+	if (r < 0) return r;
+
+	// Escribimos en el archivo (esta funcion extiende
+	// el archivo en caso de ser necesario)
+	r = file_write(
+		open_file->o_file,
+		req->req_buf,
+		req->req_n,
+		open_file->o_fd->fd_offset
+	);
+
+	// Si hubo error retornamos
+	if (r < 0) return r;
+
+	// Actualizamos el offset dentro del archivo
+	open_file->o_fd->fd_offset += r;
+
+	return r;
 }
 
 // Stat ipc->stat.req_fileid.  Return the file's struct Stat to the
