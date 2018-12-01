@@ -323,5 +323,34 @@ static int
 copy_shared_pages(envid_t child)
 {
 	// LAB 5: Your code here.
+	int r;
+
+	// Creamos los indices para iterar
+	size_t pdx;
+	size_t ptx;
+
+	// Iteramos hasta USTACKTOP para no afectar el stack de excepciones
+	for (pdx = 0 ; pdx < PDX(USTACKTOP) ; pdx++) {
+		pde_t pde = uvpd[pdx];
+
+		// Si la PDE no esta alocada continuamos
+		if ((pde & PTE_P) == 0) continue;
+
+		// Si esta alocada recorremos las PTE's
+		for (ptx = 0 ; ptx < NPTENTRIES ; ptx++) {
+			// Armamos la direccion virtual correspondiente
+			uintptr_t addr = (uintptr_t)PGADDR(pdx, ptx, 0);
+
+			pte_t pte = uvpt[PGNUM(addr)];
+
+			// Comprobamos que este alocada y tenga el bit PTE_SHARE
+			if ((pte & PTE_P) && (pte & PTE_SHARE)) {
+				// Si asi mapeamos la pagina
+				r = sys_page_map(0, (void *)addr, child, (void *)addr, pte & PTE_SYSCALL);
+				if (r < 0) return r;
+			}
+		}
+	}
+
 	return 0;
 }
