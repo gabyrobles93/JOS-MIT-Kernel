@@ -306,6 +306,7 @@ trap_dispatch(struct Trapframe *tf)
 	}
 	case IRQ_OFFSET + IRQ_TIMER: {
 		lapic_eoi(); 		// Avisamos al hardware que atrapamos la interrupcion
+		time_tick();		// Incrementamos el contador de interrupciones de clock
 		sched_yield(); 	// Actuamos en consecuencia de la interrupcion (round-robin)
 		return;
 	}
@@ -351,7 +352,7 @@ trap_dispatch(struct Trapframe *tf)
 
 
 	// Handle keyboard and serial interrupts.
-	// LAB 5: Your code here.
+	// LAB 5: Your code here
 
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
