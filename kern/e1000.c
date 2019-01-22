@@ -5,11 +5,11 @@
 
 // LAB 6: Your driver code here
 
-volatile uint32_t * bar_0;
+static volatile uint32_t * bar_0;
 static void e1000_tx_init(void);
 
-struct tx_desc tx_descriptors[E1000_MAX_DESCRIPTORS] __attribute__ ((aligned (16)));
-struct tx_packet tx_packets[E1000_MAX_DESCRIPTORS];
+static struct tx_desc tx_descriptors[E1000_MAX_DESCRIPTORS] __attribute__ ((aligned (16)));
+static struct tx_packet tx_packets[E1000_MAX_DESCRIPTORS];
 
 // Inicializa la placa de red, es invocada por el código de PCI (kern/pci.c) que detecta el la placa de red
 // en el puerto PCI del motherboard y luego recorre el arreglo de dispositivos PCI
