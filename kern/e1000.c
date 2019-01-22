@@ -87,7 +87,7 @@ int e1000_send_packet(char * buffer, size_t size) {
         memmove(tx_packets[td_tail].buffer, buffer, size);
         current_tx_desc->length = (uint16_t) size;
         current_tx_desc->status &= ~E1000_TXD_STAT_DD;
-        current_tx_desc->cmd |= E1000_TXD_CMD_RS | E1000_TXD_CMD_EOP;
+        current_tx_desc->cmd |= E1000_TXD_CMD_RS | E1000_TXD_CMD_EOP | E1000_TXD_CMD_RPS;
         setreg(E1000_TDT, (td_tail+1) % E1000_MAX_DESCRIPTORS);
     } else {
         return -E_AGAIN;    // Cola llena, se debe reintentar, quizá el hardware libere algun descriptor
