@@ -29,14 +29,6 @@ int e1000_init(struct pci_func *pcif) {
     // Inicializacion de transmision (Exercise 5)
     e1000_tx_init();
 
-    e1000_send_packet("Hola", 4);
-    e1000_send_packet("Hello", 5);
-    e1000_send_packet("World", 5);
-    e1000_send_packet("World", 5);
-    e1000_send_packet("World", 5);
-    e1000_send_packet("World", 5);
-    e1000_send_packet("World", 5);
-
     return 0;
 }
 
@@ -86,7 +78,7 @@ int e1000_send_packet(char * buffer, size_t size) {
     if (current_tx_desc->status & E1000_TXD_STAT_DD) { // El hardware procesó este descriptor y se puede reciclar
         memmove(tx_packets[td_tail].buffer, buffer, size);
         current_tx_desc->length = (uint16_t) size;
-        current_tx_desc->status &= ~E1000_TXD_STAT_DD;
+        current_tx_desc->status &=  ~E1000_TXD_STAT_DD;
         current_tx_desc->cmd |= E1000_TXD_CMD_RS | E1000_TXD_CMD_EOP | E1000_TXD_CMD_RPS;
         setreg(E1000_TDT, (td_tail+1) % E1000_MAX_DESCRIPTORS);
     } else {
