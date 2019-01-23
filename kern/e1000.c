@@ -7,6 +7,7 @@
 
 static volatile uint32_t * bar_0;
 static void e1000_tx_init(void);
+static void e1000_rx_init(void);
 
 static struct tx_desc tx_descriptors[E1000_MAX_DESCRIPTORS] __attribute__ ((aligned (16)));
 static struct tx_packet tx_packets[E1000_MAX_DESCRIPTORS];
@@ -28,6 +29,8 @@ int e1000_init(struct pci_func *pcif) {
 
     // Inicializacion de transmision (Exercise 5)
     e1000_tx_init();
+    // Inicializacion de recepción (Exercise 10)
+    e1000_rx_init();
 
     return 0;
 }
@@ -40,7 +43,7 @@ void setreg(uint32_t offset, uint32_t value) {
     bar_0[offset/4] = value;
 }
 
-void e1000_tx_init(void) {
+static void e1000_tx_init(void) {
     // Escribo ceros en el arreglo de descriptores de tx para inicializar esta memoria
     memset(tx_descriptors, 0, E1000_MAX_DESCRIPTORS * sizeof(struct tx_desc));
     // Seteo el registro TDBAL (Transmit Descriptor Base Address Low)
@@ -61,6 +64,11 @@ void e1000_tx_init(void) {
         tx_descriptors[i].addr = PADDR(tx_packets[i].buffer);
         tx_descriptors[i].status |= E1000_TXD_STAT_DD;
     }
+}
+
+static void e1000_rx_init(void) {
+    // Escribo el dirección MAC de la placa en el registro Receive Address (HARDCODED)
+    setreg(E1000_RA, 0x5634 << 16 | 0x12005452);
 }
 
 int e1000_send_packet(char * buffer, size_t size) {

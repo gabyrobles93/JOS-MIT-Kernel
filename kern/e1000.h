@@ -24,6 +24,7 @@
 #define E1000_TXD_CMD_RPS    0x00000010 /* Report Packet Sent */
 #define E1000_TXD_CMD_EOP    0x00000001 /* End of Packet */
 
+#define E1000_RA       0x05400  /* Receive Address - RW Array */
 
 #define E_AGAIN -1  /* Error, la cola está llena */
 #define E_INVAL -2  /* Error, paquete inválido */
