@@ -553,10 +553,10 @@ sys_transmit_packet(char * buffer, size_t size)
 }
 
 static int
-sys_receive_packet(char * buffer) 
+sys_receive_packet(char * buffer, size_t size) 
 {
 	if (!buffer || ((uintptr_t) buffer >= UTOP)) return -E_INVAL;
-	return e1000_receive_packet(buffer);
+	return  e1000_receive_packet(buffer, size);
 }
 
 // Dispatches to the correct kernel function, passing the arguments.
@@ -615,10 +615,10 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 		return (int32_t) sys_time_msec();
 	}
 	case SYS_transmit_packet: {
-		return (int32_t) sys_transmit_packet((char *)a1, (size_t)a2);
+		return (int32_t) sys_transmit_packet((void *)a1, (size_t)a2);
 	}
 	case SYS_receive_packet: {
-		return (int32_t) sys_receive_packet((char *)a1);
+		return (int32_t) sys_receive_packet((void *)a1, (size_t) a2);
 	}
 	default:
 		return -E_INVAL;

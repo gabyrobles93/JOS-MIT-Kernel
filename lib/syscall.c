@@ -130,7 +130,7 @@ sys_transmit_packet(char * buffer, size_t size)
 }
 
 int 
-sys_receive_packet(char * buffer)
+sys_receive_packet(void * buffer, size_t size)
 {
-	return syscall(SYS_receive_packet, 0, (uint32_t) buffer, 0, 0, 0, 0);
+	return syscall(SYS_receive_packet, 0, (uint32_t) buffer, (uint32_t) size, 0, 0, 0);
 }

@@ -52,6 +52,7 @@
 
 #define E1000_MAX_TX_DESCRIPTORS 64
 #define E1000_MAX_RX_DESCRIPTORS 128
+#define E1000_RCV_BUFFER_SIZE 2048
 
 
 
@@ -89,6 +90,6 @@ int e1000_init(struct pci_func *pcif);
 uint32_t getreg(uint32_t offset);
 void setreg(uint32_t offset, uint32_t value);
 int e1000_send_packet(char * buffer, size_t size);
-int e1000_receive_packet(char * buffer);
+int e1000_receive_packet(char * buffer, size_t size);
 
 #endif  // JOS_KERN_E1000_H

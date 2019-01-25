@@ -94,7 +94,7 @@ static void e1000_rx_init(void) {
     setreg(E1000_RDT, E1000_MAX_RX_DESCRIPTORS-1);
 
      //Seteo el registro Receive Control RCTL
-     setreg(E1000_RCTL, E1000_RCTL_EN | E1000_RCTL_BAM | E1000_RCTL_SECRC);
+    setreg(E1000_RCTL, E1000_RCTL_EN | E1000_RCTL_BAM | E1000_RCTL_SECRC);
 
     // Asocio los buffers de paquete con el address de los descriptors
     for (int i = 0; i < E1000_MAX_RX_DESCRIPTORS; i++) {
@@ -118,7 +118,7 @@ int e1000_send_packet(char * buffer, size_t size) {
         memmove(tx_packets[td_tail].buffer, buffer, size);
         current_tx_desc->length = (uint16_t) size;
         current_tx_desc->status &=  ~E1000_TXD_STAT_DD;
-        current_tx_desc->cmd |= E1000_TXD_CMD_RS | E1000_TXD_CMD_EOP | E1000_TXD_CMD_RPS;
+        current_tx_desc->cmd |= E1000_TXD_CMD_RS | E1000_TXD_CMD_EOP;
         setreg(E1000_TDT, (td_tail+1) % E1000_MAX_TX_DESCRIPTORS);
     } else {
         return -E_AGAIN;    // Cola llena, se debe reintentar, quizá el hardware libere algun descriptor
@@ -127,7 +127,7 @@ int e1000_send_packet(char * buffer, size_t size) {
     return 0;
 }
 
-int e1000_receive_packet(char * buffer) {
+int e1000_receive_packet(char * buffer, size_t size) {
 
     uint32_t next_desc = (getreg(E1000_RDT) + 1) % E1000_MAX_RX_DESCRIPTORS;
 
@@ -138,8 +138,10 @@ int e1000_receive_packet(char * buffer) {
 
     struct rx_desc * current_rx_desc = rx_descriptors + next_desc;
 
+    if (current_rx_desc->length > size) return -E_INVAL;
+
     if (current_rx_desc->status & E1000_RXD_STAT_DD) { //  If the DD bit is set, you can copy the packet data out of that descriptor's packet buffer
-        memmove(buffer, rx_packets[next_desc].buffer, current_rx_desc->length);
+        memmove(buffer, rx_packets[next_desc].buffer, (size_t) current_rx_desc->length);
         pkt_len = current_rx_desc->length;
         current_rx_desc->status &= ~E1000_RXD_STAT_DD;
         current_rx_desc->status &= ~E1000_RXD_STAT_EOP;
