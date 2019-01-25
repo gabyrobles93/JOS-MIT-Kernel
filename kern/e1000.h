@@ -47,8 +47,8 @@
 #define E1000_RXD_STAT_DD       0x01    /* Descriptor Done */
 #define E1000_RXD_STAT_EOP      0x02    /* End of Packet */
 
-#define E_AGAIN -1  /* Error, la cola está llena */
-#define E_INVAL -2  /* Error, paquete inválido */
+#define E_AGAIN 1  /* Error, la cola está llena */
+#define E_INVAL 2  /* Error, paquete inválido */
 
 #define E1000_MAX_TX_DESCRIPTORS 64
 #define E1000_MAX_RX_DESCRIPTORS 128

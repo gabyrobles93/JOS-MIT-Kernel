@@ -18,22 +18,23 @@ input(envid_t ns_envid)
     int32_t r;
     int32_t len;
 
-    struct jif_pkt * pkt = (struct jif_pkt *) REQVA;
+    //struct jif_pkt * pkt = (struct jif_pkt *) REQVA;
+    union Nsipc * pkt = (union Nsipc *) REQVA;
     sys_page_alloc(0, pkt, PTE_P | PTE_W | PTE_U);
 
     while(1) {
-        while ( (len = sys_receive_packet(pkt->jp_data, 2048)) < 0) {
+        while ( (len = sys_receive_packet(pkt->pkt.jp_data, 2048)) < 0) {
             sys_yield();
         }
 
-        pkt->jp_len = len;
+        pkt->pkt.jp_len = len;
 
-        while ((r = sys_ipc_try_send(ns_envid, NSREQ_INPUT, pkt, PTE_P | PTE_W | PTE_U)) < 0) {
+        while ((r = sys_ipc_try_send(ns_envid, NSREQ_INPUT, &(pkt->pkt), PTE_P | PTE_W | PTE_U)) < 0) {
             if (r == -E_IPC_NOT_RECV) sys_yield();
         }
 
         sys_page_unmap(0, pkt);
-        pkt = (struct jif_pkt *) REQVA;
+        pkt = (union Nsipc *) REQVA;
         sys_page_alloc(0, pkt, PTE_P | PTE_W | PTE_U);
     }
 }
