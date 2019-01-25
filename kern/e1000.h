@@ -83,7 +83,7 @@ struct tx_packet
 
 struct rx_packet
 {
-    uint8_t buffer[ETHERNET_MAX_PACKET_LEN];
+    uint8_t buffer[E1000_RCV_BUFFER_SIZE];
 }__attribute__((packed));;
 
 int e1000_init(struct pci_func *pcif);
