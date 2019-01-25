@@ -132,7 +132,7 @@ int e1000_receive_packet(char * buffer, size_t size) {
     uint32_t next_desc = (getreg(E1000_RDT) + 1) % E1000_MAX_RX_DESCRIPTORS;
 
     // Chequeo si el anillo esta vacio
-    if (next_desc == getreg(E1000_RDT)) return -E_AGAIN;
+    if (next_desc == getreg(E1000_RDH)) return -E_AGAIN;
 
     uint32_t pkt_len;
 
