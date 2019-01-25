@@ -15,23 +15,25 @@ input(envid_t ns_envid)
     // reading from it for a while, so don't immediately receive
     // another packet in to the same physical page.
 
-    int32_t value;
+    int32_t r;
     int32_t len;
- 
+
+    struct jif_pkt * pkt = (struct jif_pkt *) REQVA;
+    sys_page_alloc(0, pkt, PTE_P | PTE_W | PTE_U);
 
     while(1) {
-        char buffer[2048];
-        while ( (len = sys_receive_packet(buffer, 2048)) < 0) {
+        while ( (len = sys_receive_packet(pkt->jp_data, 2048)) < 0) {
             sys_yield();
         }
 
-		nsipcbuf.pkt.jp_len = len;
+        pkt->jp_len = len;
 
-        memmove(nsipcbuf.pkt.jp_data, buffer, len);
-
-        while ((value = sys_ipc_try_send(ns_envid, NSREQ_INPUT, &nsipcbuf, PTE_P | PTE_W | PTE_U)) < 0) {
-            int32_t time = sys_time_msec();
-            while (sys_time_msec()-time < 1){sys_yield();}
+        while ((r = sys_ipc_try_send(ns_envid, NSREQ_INPUT, pkt, PTE_P | PTE_W | PTE_U)) < 0) {
+            if (r == -E_IPC_NOT_RECV) sys_yield();
         }
+
+        sys_page_unmap(0, pkt);
+        pkt = (struct jif_pkt *) REQVA;
+        sys_page_alloc(0, pkt, PTE_P | PTE_W | PTE_U);
     }
 }
