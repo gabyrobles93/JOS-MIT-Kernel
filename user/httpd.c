@@ -78,7 +78,24 @@ static int
 send_data(struct http_request *req, int fd)
 {
 	// LAB 6: Your code here.
-	panic("send_data not implemented");
+	int r, w = 0;
+	char * buffer[BUFFSIZE];
+	r = read(fd, buffer, BUFFSIZE);
+
+	while (r > 0) {
+		w = write(req->sock, buffer, BUFFSIZE);
+		if (w < 0) break;
+		r = read(fd, buffer, BUFFSIZE);
+	}
+
+	if (r < 0) {
+		panic("send_data failed reading data on fd %i.\n", fd);
+	}
+	if (w < 0) {
+		panic("send_data failed writing data on req fd %i.\n", req->sock);
+	}
+
+	return 0;
 }
 
 static int
@@ -222,14 +239,31 @@ send_file(struct http_request *req)
 	int r;
 	off_t file_size = -1;
 	int fd;
+	struct Stat statbuf;
 
 	// open the requested url for reading
+	fd = open(req->url, O_RDWR);
 	// if the file does not exist, send a 404 error using send_error
-	// if the file is a directory, send a 404 error using send_error
-	// set file_size to the size of the file
+	if (fd < 0) {
+		send_error(req, 404);
+		r = fd;
+		goto end;
+	}
 
-	// LAB 6: Your code here.
-	panic("send_file not implemented");
+	r = fstat(fd, &statbuf);
+	if (r < 0) {
+		panic("send_file failed on fsstat %i\n", r);
+	}
+
+	// if the file is a directory, send a 404 error using send_error
+	if (statbuf.st_isdir) {
+		send_error(req, 404);
+		r = -1;
+		goto end;
+	}
+
+	// set file_size to the size of the file
+	file_size = statbuf.st_size;
 
 	if ((r = send_header(req, 200)) < 0)
 		goto end;
