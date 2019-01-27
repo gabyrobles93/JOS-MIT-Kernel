@@ -1,4 +1,4 @@
-**1. ¿How did you structure your transmit implementation? In particular, what do you do if the transmit ring is full?
+**1. How did you structure your transmit implementation? In particular, what do you do if the transmit ring is full?
 
 En primer lugar implementé la inicialización de la transmisión (e1000_tx_init), siguiendo los pasos de la hoja de datos de la placa de red. Aquí tome algunas decisiones de diseño, como por ejemplo:
 
@@ -26,3 +26,10 @@ En la inicialización de la recepción se setearon los registros de la placa sig
 En forma análoga a la transmisión, en la inicialización se asocian los arreglos entre si. El valor buffer address de las estructuras de descriptor de recepción se asocian uno a uno a las direcciones FISICAS de los paquetes de datos del segundo arreglo.
 
 Luego implementé la función de recepción, que en primer lugar obtiene el indice del Tail en el anillo de descriptores. Se chequea si el anillo esta vacío viendo si el bit DD (Descriptor Done) esta encendido. En caso que el anillo no esté vacío, significa que hay algo para recibir, por lo tanto se mueve la información del buffer del descriptor al buffer que se recibe como parámetro. Luego se apagan los bits DD y EOP y por último se setea el registro RDT en la siguiente posición. Esta función retorna el largo del buffer recibido.
+
+**3. What does the web page served by JOS's web server say?
+
+This file came from JOS.
+Cheesy web page! 
+
+**4. How long approximately did it take you to do this lab? 
